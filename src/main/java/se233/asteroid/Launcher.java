@@ -1,18 +1,17 @@
 package se233.asteroid;
 
 import javafx.application.Application;
-import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-
-import java.io.IOException;
+import se233.asteroid.View.GameStage;
 
 public class Launcher extends Application {
     @Override
-    public void start(Stage stage) throws IOException {
-        FXMLLoader fxmlLoader = new FXMLLoader(Launcher.class.getResource("hello-view.fxml"));
-        Scene scene = new Scene(fxmlLoader.load(), 320, 240);
-        stage.setTitle("Hello!");
+    public void start(Stage stage) {
+        GameStage gameStage = new GameStage();
+        Scene scene = new Scene(gameStage, 800, 600);
+
+        stage.setTitle("Asteroid Game");
         stage.setScene(scene);
         stage.show();
     }

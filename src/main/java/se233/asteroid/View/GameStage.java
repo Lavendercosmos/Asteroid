@@ -1,33 +1,23 @@
 package se233.asteroid.View;
-import javax.swing.*;
-import java.awt.*;
-import javax.swing.*;
-import java.awt.*;
 
-public class GameStage extends JPanel {
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.Pane;
 
-        private ImageIcon gifIcon;
+public class GameStage extends Pane {
+    private ImageView backgroundView;
 
-        public GameStage() {
-            // โหลดไฟล์ GIF
-            gifIcon = new ImageIcon("src/main/resources/se233/asteroid/assets/Backgrounds/SpaceBG.gif"); // เปลี่ยนชื่อไฟล์ตามที่คุณใช้
-        }
+    public GameStage() {
+        // Load the GIF using JavaFX Image
+        Image gifImage = new Image(getClass().getResourceAsStream("/se233/asteroid/assets/Backgrounds/SpaceBG.gif"));
+        backgroundView = new ImageView(gifImage);
 
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            // วาด GIF
-            g.drawImage(gifIcon.getImage(), 0, 0, getWidth(), getHeight(), this);
-        }
+        // Make background image resize with the window
+        backgroundView.fitWidthProperty().bind(this.widthProperty());
+        backgroundView.fitHeightProperty().bind(this.heightProperty());
 
-        public static void main(String[] args) {
-            JFrame frame = new JFrame("Game");
-            GameStage panel = new GameStage();
-            frame.add(panel);
-            frame.setSize(800, 600); // ขนาดหน้าต่าง
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setVisible(true);
-        }
+        // Add background to the pane
+        getChildren().add(backgroundView);
     }
-
+}
 
