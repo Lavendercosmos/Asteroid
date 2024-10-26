@@ -3,7 +3,7 @@ package se233.asteroid;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import se233.asteroid.View.GameStage;
+import se233.asteroid.display.GameStage;
 
 public class Launcher extends Application {
     @Override
