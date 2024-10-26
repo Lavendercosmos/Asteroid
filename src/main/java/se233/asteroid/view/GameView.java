@@ -1,238 +1,169 @@
 package se233.asteroid.view;
 
+import javafx.animation.AnimationTimer;
 import javafx.geometry.Point2D;
 import javafx.scene.layout.Pane;
 import javafx.scene.control.Button;
-import se233.asteroid.model.Character;
-import se233.asteroid.model.PlayerShip;
-import se233.asteroid.model.Bullet;
-import se233.asteroid.model.Asteroid;
-import se233.asteroid.model.Boss;
+import se233.asteroid.model.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Iterator;
-import javafx.animation.AnimationTimer;
-import javafx.scene.transform.Scale;
+import se233.asteroid.model.Character;
+
+import java.util.*;
 
 public class GameView extends Pane {
     private static final Logger logger = LogManager.getLogger(GameView.class);
+
+    // Constants
     public static final double DEFAULT_WIDTH = 800;
     public static final double DEFAULT_HEIGHT = 600;
+    private static final long BULLET_COOLDOWN = 250_000_000L; // 250ms
 
-    private GameStage gameStage;
+    // Game components
+    private final GameStage gameStage;
+    private final List<Character> gameObjects;
+    private final List<Bullet> bullets;
     private PlayerShip player;
-    private List<Bullet> bullets;
-    private List<Asteroid> asteroids;
     private Boss boss;
+
+    // State tracking
     private boolean isGameStarted;
     private boolean isPaused;
-    private AnimationTimer gameLoop;
     private double currentWidth;
     private double currentHeight;
     private int currentWave;
     private int score;
-    private int difficultyLevel;
     private long lastBulletTime;
-    private static long BULLET_COOLDOWN = 250_000_000; // 250ms in nanoseconds
 
     public GameView() {
-        currentWidth = DEFAULT_WIDTH;
-        currentHeight = DEFAULT_HEIGHT;
-        currentWave = 1;
-        score = 0;
-        difficultyLevel = 1;
+        // Initialize collections
+        this.gameObjects = new ArrayList<>();
+        this.bullets = new ArrayList<>();
 
-        gameStage = new GameStage();
-        bullets = new ArrayList<>();
-        asteroids = new ArrayList<>();
+        // Setup stage and size
+        this.gameStage = new GameStage();
+        this.currentWidth = DEFAULT_WIDTH;
+        this.currentHeight = DEFAULT_HEIGHT;
         getChildren().add(gameStage);
 
-        isGameStarted = false;
-        isPaused = false;
+        // Initialize state
+        this.isGameStarted = false;
+        this.isPaused = false;
+        this.currentWave = 1;
+        this.score = 0;
 
-        setupGameLoop();
         setupButtonHandlers();
+        setupGameLoop();
 
         logger.info("GameView initialized");
     }
 
     private void setupButtonHandlers() {
-        // Get buttons from GameStage
-        Button startButton = gameStage.getStartButton();
-        Button restartButton = gameStage.getRestartButton();
-        Button resumeButton = gameStage.getResumeButton();
-
-        // Setup handlers
-        startButton.setOnAction(e -> startGame());
-        restartButton.setOnAction(e -> reset());
-        resumeButton.setOnAction(e -> resumeGame());
+        gameStage.getStartButton().setOnAction(e -> startGame());
+        gameStage.getRestartButton().setOnAction(e -> resetGame());
+        gameStage.getResumeButton().setOnAction(e -> resumeGame());
     }
 
     private void setupGameLoop() {
-        gameLoop = new AnimationTimer() {
+        AnimationTimer gameLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
                 if (!isPaused && isGameStarted) {
-                    updateGame(now);
+                    updateGame();
+                    checkCollisions();
                     checkWaveCompletion();
                 }
             }
         };
+        gameLoop.start();
     }
 
-    private void updateGame(long now) {
-        if (player != null) {
-            updatePlayer();
-            updateBullets();
-            updateAsteroids();
-            updateBoss();
-            checkCollisions();
-            updateGameDifficulty();
-        }
-    }
-
-    private void updatePlayer() {
-        if (player.isAlive()) {
+    private void updateGame() {
+        // Update player
+        if (player != null && player.isAlive()) {
             player.update();
             wrapAround(player);
-
-            // Update player's screen position
-            Point2D gamePos = gameStage.screenToGame(player.getPosition());
-            Point2D screenPos = gameStage.gameToScreen(gamePos);
-            player.setPosition(screenPos);
         }
-    }
 
-    private void updateBullets() {
-        Iterator<Bullet> bulletIterator = bullets.iterator();
-        while (bulletIterator.hasNext()) {
-            Bullet bullet = bulletIterator.next();
+        // Update bullets
+        Iterator<Bullet> bulletIter = bullets.iterator();
+        while (bulletIter.hasNext()) {
+            Bullet bullet = bulletIter.next();
             bullet.update();
-
-            Point2D gamePos = gameStage.screenToGame(bullet.getPosition());
-            if (isOffScreen(gamePos)) {
+            if (isOffScreen(bullet.getPosition())) {
                 gameStage.removeBullet(bullet);
-                bulletIterator.remove();
-            } else {
-                // Update bullet's screen position
-                Point2D screenPos = gameStage.gameToScreen(gamePos);
-                bullet.setPosition(screenPos);
+                bulletIter.remove();
             }
         }
-    }
 
-    private void updateAsteroids() {
-        Iterator<Asteroid> asteroidIterator = asteroids.iterator();
-        while (asteroidIterator.hasNext()) {
-            Asteroid asteroid = asteroidIterator.next();
-            if (asteroid.isAlive()) {
-                asteroid.update();
-                wrapAround(asteroid);
-
-                // Update asteroid's screen position
-                Point2D gamePos = gameStage.screenToGame(asteroid.getPosition());
-                Point2D screenPos = gameStage.gameToScreen(gamePos);
-                asteroid.setPosition(screenPos);
-            } else {
-                gameStage.removeGameObject(asteroid);
-                asteroidIterator.remove();
-                increaseScore(100 * asteroid.getSize());
+        // Update other game objects
+        for (Character obj : gameObjects) {
+            if (obj.isAlive()) {
+                obj.update();
+                wrapAround(obj);
             }
         }
-    }
 
-    private void updateBoss() {
+        // Update boss
         if (boss != null && boss.isAlive()) {
-            Point2D playerPos = gameStage.screenToGame(player.getPosition());
-            boss.update(0.016, playerPos);
-
-            // Update boss's screen position
-            Point2D gamePos = gameStage.screenToGame(boss.getPosition());
-            Point2D screenPos = gameStage.gameToScreen(gamePos);
-            boss.setPosition(screenPos);
+            boss.update();
+            wrapAround(boss);
         }
     }
 
     private void checkCollisions() {
-        // Convert positions to game coordinates for collision checks
-        Point2D playerGamePos = gameStage.screenToGame(player.getPosition());
+        if (player == null || !player.isAlive() || player.isInvulnerable()) return;
 
         // Check bullet collisions
-        Iterator<Bullet> bulletIterator = bullets.iterator();
-        while (bulletIterator.hasNext()) {
-            Bullet bullet = bulletIterator.next();
-            Point2D bulletGamePos = gameStage.screenToGame(bullet.getPosition());
-
+        for (Bullet bullet : bullets) {
             // Check asteroid collisions
-            Iterator<Asteroid> asteroidIterator = asteroids.iterator();
-            boolean bulletHit = false;
-
-            while (asteroidIterator.hasNext() && !bulletHit) {
-                Asteroid asteroid = asteroidIterator.next();
-                Point2D asteroidGamePos = gameStage.screenToGame(asteroid.getPosition());
-
-                if (checkCollision(bulletGamePos, asteroidGamePos, bullet.getRadius(), asteroid.getRadius())) {
-                    handleAsteroidHit(asteroid);
-                    gameStage.removeBullet(bullet);
-                    bulletIterator.remove();
-                    bulletHit = true;
+            for (Character obj : gameObjects) {
+                if (obj instanceof Asteroid && obj.isAlive() && bullet.collidesWith(obj)) {
+                    handleAsteroidHit((Asteroid)obj);
+                    bullet.setActive(false);
+                    break;
                 }
             }
-
             // Check boss collision
-            if (!bulletHit && boss != null && boss.isAlive()) {
-                Point2D bossGamePos = gameStage.screenToGame(boss.getPosition());
-                if (checkCollision(bulletGamePos, bossGamePos, bullet.getRadius(), boss.getRadius())) {
-                    handleBossHit();
-                    gameStage.removeBullet(bullet);
-                    bulletIterator.remove();
-                }
+            if (boss != null && boss.isAlive() && bullet.collidesWith(boss)) {
+                handleBossHit();
+                bullet.setActive(false);
             }
         }
 
-        // Check player collisions with asteroids
-        if (player.isAlive() && !player.isInvulnerable()) {
-            for (Asteroid asteroid : asteroids) {
-                Point2D asteroidGamePos = gameStage.screenToGame(asteroid.getPosition());
-                if (checkCollision(playerGamePos, asteroidGamePos, player.getRadius(), asteroid.getRadius())
-                        && !asteroid.isExploding()) {
-                    handlePlayerHit();
-                }
-            }
-
-            // Check player collision with boss
-            if (boss != null && boss.isAlive()) {
-                Point2D bossGamePos = gameStage.screenToGame(boss.getPosition());
-                if (checkCollision(playerGamePos, bossGamePos, player.getRadius(), boss.getRadius())) {
-                    handlePlayerHit();
-                }
+        // Check player collisions
+        for (Character obj : gameObjects) {
+            if (obj.isAlive() && player.collidesWith(obj)) {
+                handlePlayerCollision();
+                break;
             }
         }
-    }
 
-    private boolean checkCollision(Point2D pos1, Point2D pos2, double radius1, double radius2) {
-        double distance = pos1.distance(pos2);
-        return distance < (radius1 + radius2);
+        // Check boss collision with player
+        if (boss != null && boss.isAlive() && player.collidesWith(boss)) {
+            handlePlayerCollision();
+        }
+
+        // Remove inactive bullets
+        bullets.removeIf(bullet -> !bullet.isAlive());
     }
 
     private void handleAsteroidHit(Asteroid asteroid) {
-        asteroid.explode();
+        asteroid.hit();
         gameStage.showExplosion(asteroid.getPosition());
 
-        if (asteroid.getSize() > 1) {
-            List<Asteroid> fragments = asteroid.split();
-            for (Asteroid fragment : fragments) {
-                addAsteroid(fragment);
+        if (!asteroid.isAlive()) {
+            if (asteroid.getSize() > 1) {
+                for (Asteroid fragment : asteroid.split()) {
+                    addGameObject(fragment);
+                }
             }
+            increaseScore(100 * asteroid.getSize());
         }
-
-        increaseScore(100 * asteroid.getSize());
     }
 
     private void handleBossHit() {
-        boss.hit(10); // or whatever damage value you want bullets to deal
+        boss.hit(10);
         if (!boss.isAlive()) {
             gameStage.showExplosion(boss.getPosition());
             increaseScore(5000);
@@ -240,7 +171,7 @@ public class GameView extends Pane {
         }
     }
 
-    private void handlePlayerHit() {
+    private void handlePlayerCollision() {
         player.hit();
         gameStage.updateLives(player.getLives());
         gameStage.showExplosion(player.getPosition());
@@ -250,44 +181,38 @@ public class GameView extends Pane {
         }
     }
 
+    private void addGameObject(Character obj) {
+        gameObjects.add(obj);
+        gameStage.addGameObject(obj);
+    }
+
     private void wrapAround(Character character) {
-        Point2D screenPos = character.getPosition();
-        Point2D gamePos = gameStage.screenToGame(screenPos);
-        double x = gamePos.getX();
-        double y = gamePos.getY();
+        Point2D pos = character.getPosition();
+        double x = pos.getX();
+        double y = pos.getY();
         boolean wrapped = false;
 
-        if (x < 0) {
-            x = DEFAULT_WIDTH;
-            wrapped = true;
-        }
-        if (x > DEFAULT_WIDTH) {
-            x = 0;
-            wrapped = true;
-        }
-        if (y < 0) {
-            y = DEFAULT_HEIGHT;
-            wrapped = true;
-        }
-        if (y > DEFAULT_HEIGHT) {
-            y = 0;
-            wrapped = true;
-        }
+        if (x < -50) { x = DEFAULT_WIDTH + 50; wrapped = true; }
+        if (x > DEFAULT_WIDTH + 50) { x = -50; wrapped = true; }
+        if (y < -50) { y = DEFAULT_HEIGHT + 50; wrapped = true; }
+        if (y > DEFAULT_HEIGHT + 50) { y = -50; wrapped = true; }
 
         if (wrapped) {
-            Point2D newGamePos = new Point2D(x, y);
-            Point2D newScreenPos = gameStage.gameToScreen(newGamePos);
-            character.setPosition(newScreenPos);
+            character.setPosition(new Point2D(x, y));
         }
     }
 
     private boolean isOffScreen(Point2D position) {
-        return position.getX() < -50 || position.getX() > DEFAULT_WIDTH + 50 ||
-                position.getY() < -50 || position.getY() > DEFAULT_HEIGHT + 50;
+        return position.getX() < -100 || position.getX() > DEFAULT_WIDTH + 100 ||
+                position.getY() < -100 || position.getY() > DEFAULT_HEIGHT + 100;
     }
 
     private void checkWaveCompletion() {
-        if (asteroids.isEmpty() && (boss == null || !boss.isAlive())) {
+        boolean allAsteroidsDestroyed = gameObjects.stream()
+                .filter(obj -> obj instanceof Asteroid)
+                .noneMatch(Character::isAlive);
+
+        if (allAsteroidsDestroyed && (boss == null || !boss.isAlive())) {
             startNextWave();
         }
     }
@@ -301,24 +226,19 @@ public class GameView extends Pane {
         } else {
             spawnAsteroids();
         }
-
-        updateGameDifficulty();
     }
 
     private void spawnBoss() {
-        // Create boss at a random edge position
-        double x = Math.random() < 0.5 ? 0 : DEFAULT_WIDTH;
-        double y = Math.random() * DEFAULT_HEIGHT;
-        Point2D spawnPos = gameStage.gameToScreen(new Point2D(x, y));
-
+        Point2D spawnPos = new Point2D(DEFAULT_WIDTH/2, -50);
         boss = new Boss(spawnPos, currentWave);
         gameStage.addGameObject(boss);
+
     }
 
     private void spawnAsteroids() {
         int baseCount = 4;
         int additionalCount = (currentWave - 1) * 2;
-        int totalCount = Math.min(baseCount + additionalCount, 12); // Maximum 12 asteroids
+        int totalCount = Math.min(baseCount + additionalCount, 12);
 
         for (int i = 0; i < totalCount; i++) {
             spawnAsteroid();
@@ -326,48 +246,31 @@ public class GameView extends Pane {
     }
 
     private void spawnAsteroid() {
-        // Spawn asteroid at random edge position
-        double x, y;
-        if (Math.random() < 0.5) {
-            x = Math.random() < 0.5 ? -50 : DEFAULT_WIDTH + 50;
-            y = Math.random() * DEFAULT_HEIGHT;
-        } else {
-            x = Math.random() * DEFAULT_WIDTH;
-            y = Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50;
-        }
+        double x = Math.random() * DEFAULT_WIDTH;
+        double y = Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50;
+        Point2D spawnPos = new Point2D(x, y);
 
-        Point2D spawnPos = gameStage.gameToScreen(new Point2D(x, y));
-        Asteroid asteroid = new Asteroid(spawnPos, 3); // Size 3 is largest
-        addAsteroid(asteroid);
-    }
-
-    private void updateGameDifficulty() {
-        difficultyLevel = 1 + (currentWave - 1) / 3;
-        // Update game speed and other difficulty parameters based on difficultyLevel
+        Asteroid asteroid = new Asteroid(spawnPos, 3);
+        addGameObject(asteroid);
     }
 
     private void increaseScore(int points) {
-        score += points * difficultyLevel;
+        score += points;
         gameStage.updateScore(score);
     }
 
     // Public control methods
     public void startGame() {
         if (!isGameStarted) {
-            // Create player at center of screen
-            Point2D centerGame = new Point2D(DEFAULT_WIDTH/2, DEFAULT_HEIGHT/2);
-            Point2D centerScreen = gameStage.gameToScreen(centerGame);
-            player = new PlayerShip(centerScreen);
-            gameStage.addGameObject(player);
-
-            // Initialize first wave
-            currentWave = 1;
-            score = 0;
-            spawnAsteroids();
-
             isGameStarted = true;
             gameStage.hideStartMenu();
-            gameLoop.start();
+
+            player = new PlayerShip(new Point2D(DEFAULT_WIDTH/2, DEFAULT_HEIGHT/2));
+            gameStage.addGameObject(player);
+
+            spawnAsteroids();
+            score = 0;
+            currentWave = 1;
 
             logger.info("Game started");
         }
@@ -377,7 +280,6 @@ public class GameView extends Pane {
         if (isGameStarted && !isPaused) {
             isPaused = true;
             gameStage.showPauseMenu();
-            logger.info("Game paused");
         }
     }
 
@@ -385,10 +287,27 @@ public class GameView extends Pane {
         if (isPaused) {
             isPaused = false;
             gameStage.hidePauseMenu();
-            logger.info("Game resumed");
         }
     }
 
+    public void resetGame() {
+        gameObjects.clear();
+        bullets.clear();
+        boss = null;
+        player = null;
+        isGameStarted = false;
+        isPaused = false;
+        currentWave = 1;
+        score = 0;
+        gameStage.reset();
+    }
+
+    private void endGame() {
+        isGameStarted = false;
+        gameStage.showGameOver(score);
+    }
+
+    // Movement controls
     public void shoot() {
         if (isGameStarted && !isPaused && player != null && player.isAlive()) {
             long currentTime = System.nanoTime();
@@ -403,270 +322,28 @@ public class GameView extends Pane {
         }
     }
 
-    private void endGame() {
-        isGameStarted = false;
-        gameLoop.stop();
-        gameStage.showGameOver(score);
-        logger.info("Game over with score: {}", score);
-    }
+    public void moveLeft() { if (player != null) player.moveLeft(); }
+    public void moveRight() { if (player != null) player.moveRight(); }
+    public void moveUp() { if (player != null) player.moveUp(); }
+    public void moveDown() { if (player != null) player.moveDown(); }
+    public void rotateLeft() { if (player != null) player.rotateLeft(); }
+    public void rotateRight() { if (player != null) player.rotateRight(); }
+    public void thrust() { if (player != null) player.thrust(); }
+    public void stopThrust() { if (player != null) player.stopThrust(); }
 
-    public void reset() {
-        // Clear all game objects
-        bullets.clear();
-        asteroids.clear();
-        boss = null;
-
-        // Reset player
-        if (player != null) {
-            player = null;
-        }
-
-        // Reset game state
-        isGameStarted = false;
-        isPaused = false;
-        currentWave = 1;
-        score = 0;
-        difficultyLevel = 1;
-        lastBulletTime = 0;
-
-        // Reset UI
-        gameStage.reset();
-
-        logger.info("Game reset");
-    }
-
-    // Movement controls
-    public void moveLeft() {
-        if (player != null) player.moveLeft();
-    }
-
-    public void moveRight() {
-        if (player != null) player.moveRight();
-    }
-
-    public void moveUp() {
-        if (player != null) player.moveUp();
-    }
-
-    public void moveDown() {
-        if (player != null) player.moveDown();
-    }
-
-    public void rotateLeft() {
-        if (player != null) player.rotateLeft();
-    }
-
-    public void rotateRight() {
-        if (player != null) player.rotateRight();
-    }
-
-    public void thrust() {
-        if (player != null) player.thrust();
-    }
-    public void stopThrust() {
-        if (player != null) player.stopThrust();
-    }
-
-    // Resize handling
+    // Window resize handling
     public void handleResize(double width, double height) {
         currentWidth = width;
         currentHeight = height;
         gameStage.handleResize(width, height);
-
-        if (player != null) {
-            updateObjectPosition(player);
-        }
-
-        for (Bullet bullet : bullets) {
-            updateObjectPosition(bullet);
-        }
-
-        for (Asteroid asteroid : asteroids) {
-            updateObjectPosition(asteroid);
-        }
-
-        if (boss != null) {
-            updateObjectPosition(boss);
-        }
-
-        logger.debug("Game view resized to: {}x{}", width, height);
     }
 
-    private void updateObjectPosition(Character gameObject) {
-        Point2D gamePos = gameStage.screenToGame(gameObject.getPosition());
-        Point2D screenPos = gameStage.gameToScreen(gamePos);
-        gameObject.setPosition(screenPos);
-    }
-
-    // Getters for GameStage controls
-    public Button getStartButton() {
-        return gameStage.getStartButton();
-    }
-
-    public Button getRestartButton() {
-        return gameStage.getRestartButton();
-    }
-
-    public Button getResumeButton() {
-        return gameStage.getResumeButton();
-    }
-
-    // Game state getters
-    public boolean isGameStarted() {
-        return isGameStarted;
-    }
-
-    public boolean isPaused() {
-        return isPaused;
-    }
-
-    public int getCurrentWave() {
-        return currentWave;
-    }
-
-    public int getScore() {
-        return score;
-    }
-
-    public int getDifficultyLevel() {
-        return difficultyLevel;
-    }
-
-    public static double getDefaultWidth() {
-        return DEFAULT_WIDTH;
-    }
-
-    public static double getDefaultHeight() {
-        return DEFAULT_HEIGHT;
-    }
-
-    public double getCurrentWidth() {
-        return currentWidth;
-    }
-
-    public double getCurrentHeight() {
-        return currentHeight;
-    }
-
-    // Game state updates
-    public void addAsteroid(Asteroid asteroid) {
-        asteroids.add(asteroid);
-        gameStage.addGameObject(asteroid);
-        logger.debug("Added asteroid at position: {}", asteroid.getPosition());
-    }
-
-    public void removeAsteroid(Asteroid asteroid) {
-        asteroids.remove(asteroid);
-        gameStage.removeGameObject(asteroid);
-        logger.debug("Removed asteroid at position: {}", asteroid.getPosition());
-    }
-
-    // Power-up and special effects methods
-    public void activateShield() {
-        if (player != null) {
-            player.activateShield();
-            // Add visual effect
-            gameStage.showShieldEffect(player.getPosition());
-        }
-    }
-
-    public void activateRapidFire() {
-        if (player != null) {
-            BULLET_COOLDOWN = 125_000_000; // 125ms cooldown
-            // Start timer to reset cooldown
-            new AnimationTimer() {
-                private long startTime = System.nanoTime();
-                @Override
-                public void handle(long now) {
-                    if (now - startTime >= 5_000_000_000L) { // 5 seconds
-                        BULLET_COOLDOWN = 250_000_000; // Reset to normal
-                        this.stop();
-                    }
-                }
-            }.start();
-        }
-    }
-
-
-//    // Debug methods
-//    public void toggleDebugMode() {
-//        // Add debug visualization
-//        for (Asteroid asteroid : asteroids) {
-//            asteroid.toggleDebugView();
-//        }
-//        if (player != null) {
-//            player.toggleDebugView();
-//        }
-//        if (boss != null) {
-//            boss.toggleDebugView();
-//        }
-//    }
-
-    // Additional helper methods
-    private void spawnPowerUp(Point2D position) {
-        // Implementation for power-up spawning
-        logger.debug("Power-up spawned at position: {}", position);
-    }
-
-    private void handlePowerUpCollection(String type) {
-        switch (type) {
-            case "SHIELD":
-                activateShield();
-                break;
-            case "RAPID_FIRE":
-                activateRapidFire();
-                break;
-            case "EXTRA_LIFE":
-                if (player != null) {
-                    player.addLife();
-                    gameStage.updateLives(player.getLives());
-                }
-                break;
-            default:
-                logger.warn("Unknown power-up type: {}", type);
-        }
-    }
-
-    // Sound effect methods
-    public void playSound(String soundEffect) {
-        switch (soundEffect) {
-            case "SHOOT":
-                // Play shoot sound
-                break;
-            case "EXPLOSION":
-                // Play explosion sound
-                break;
-            case "POWER_UP":
-                // Play power-up sound
-                break;
-            default:
-                logger.warn("Unknown sound effect: {}", soundEffect);
-        }
-    }
-
-    // Clean up resources
-    public void dispose() {
-        if (gameLoop != null) {
-            gameLoop.stop();
-        }
-
-        // Clear all collections
-        bullets.clear();
-        asteroids.clear();
-
-        // Clean up player
-        if (player != null) {
-            player = null;
-        }
-
-        // Clean up boss
-        if (boss != null) {
-            boss = null;
-        }
-
-        // Remove all children
-        getChildren().clear();
-
-        logger.info("Game view disposed");
-    }
+    // Getters
+    public boolean isGameStarted() { return isGameStarted; }
+    public boolean isPaused() { return isPaused; }
+    public int getCurrentWave() { return currentWave; }
+    public int getScore() { return score; }
+    public Button getStartButton() { return gameStage.getStartButton(); }
+    public Button getRestartButton() { return gameStage.getRestartButton(); }
+    public Button getResumeButton() { return gameStage.getResumeButton(); }
 }

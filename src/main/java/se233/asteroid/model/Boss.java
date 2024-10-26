@@ -9,12 +9,17 @@ public class Boss extends Character {
     private static final int POINTS = 10;
     private int attackPattern = 0;
     private double timeSinceLastAttack = 0;
-    private int health ;
+    private int health;
 
-    public Boss(Point2D position, int wave) {
-        super("/se233/asteroid/assets/Sprites/boss.png", position, 50);
+    /**
+     * Creates a new Boss character.
+     * @param startPosition Starting position for the boss
+     * @param wave Current game wave number (affects boss health)
+     */
+    public Boss(Point2D startPosition, int wave) {
+        super("/se233/asteroid/assets/Sprites/boss.png", startPosition, 50);
         health = 200 * wave; // Scale health with wave number
-        logger.info("Boss created at position: {} with health: {}", position, health);
+        logger.info("Boss created at position: {} with health: {}", startPosition, health);
     }
 
     public void update(double deltaTime, Point2D playerPosition) {
@@ -88,9 +93,17 @@ public class Boss extends Character {
         }
     }
 
-    public int getPoints() { return POINTS; }
-    public double getHealth() { return health; }
-    public double getRadius() {
-        return 30.0; // หรือค่าอื่นที่เหมาะสม
+    // Getters
+    public int getPoints() {
+        return POINTS;
+    }
+
+    public double getHealth() {
+        return health;
+    }
+
+    @Override
+    public double getHitRadius() {
+        return 50.0; // Use hit radius from constructor
     }
 }

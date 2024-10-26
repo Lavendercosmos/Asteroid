@@ -15,7 +15,6 @@ import org.apache.logging.log4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 
-
 public class Asteroid extends Character {
     private static final Logger logger = LogManager.getLogger(Asteroid.class);
 
@@ -41,6 +40,8 @@ public class Asteroid extends Character {
     private List<Image> explosionFrames;
     private int currentExplosionFrame;
     private Timeline explosionAnimation;
+    private double currentSpeed;
+    private double directionAngle;
 
     public Asteroid(Point2D position, int size) {
         super(ASTEROID_BASE_PATH, position, size == 1 ? SMALL_RADIUS : LARGE_RADIUS);
@@ -50,18 +51,67 @@ public class Asteroid extends Character {
         this.rotationSpeed = size == 1 ? SMALL_ROTATION_SPEED : LARGE_ROTATION_SPEED;
         this.isExploding = false;
 
+        // Initialize speed based on size
+        this.currentSpeed = size == 1 ? SMALL_SPEED : LARGE_SPEED;
+
+        // Set random direction angle in radians
+        this.directionAngle = Math.random() * 2 * Math.PI;
+
         // Initialize explosion frames
         this.explosionFrames = loadExplosionFrames();
         setupExplosionAnimation();
 
-        // Set random velocity based on size
-        initializeVelocity();
-
         // Set random initial rotation
         this.rotation = Math.random() * 360;
 
-        logger.info("Created {} asteroid at position: {}",
-                size == 1 ? "small" : "large", position);
+        // Initialize velocity for continuous movement
+        initializeVelocity();
+
+        logger.info("Created {} asteroid at position: {} with speed: {} and angle: {}°",
+                size == 1 ? "small" : "large", position, currentSpeed, Math.toDegrees(directionAngle));
+    }
+
+    private void initializeVelocity() {
+        // Calculate velocity components based on direction and speed
+        double vx = Math.cos(directionAngle) * currentSpeed;
+        double vy = Math.sin(directionAngle) * currentSpeed;
+        this.velocity = new Point2D(vx, vy);
+    }
+
+    public void hit() {
+        if (isAlive && !isExploding) {
+            logger.debug("Asteroid hit at position: {}", position);
+            explode();
+        }
+    }
+
+    @Override
+    public void update() {
+        if (!isExploding) {
+            // Update position based on current velocity
+            position = position.add(velocity);
+
+            // Update rotation
+            rotation += rotationSpeed;
+            if (rotation >= 360) {
+                rotation -= 360;
+            }
+
+            // Update sprite position and rotation
+            updateSpritePosition();
+            sprite.setRotate(rotation);
+
+            logger.trace("Asteroid updated - Position: {}, Velocity: {}, Rotation: {}",
+                    position, velocity, rotation);
+        }
+    }
+
+    @Override
+    protected void updateSpritePosition() {
+        if (!isExploding) {
+            sprite.setTranslateX(position.getX() - sprite.getFitWidth() / 2);
+            sprite.setTranslateY(position.getY() - sprite.getFitHeight() / 2);
+        }
     }
 
     private List<Image> loadExplosionFrames() {
@@ -76,14 +126,12 @@ public class Asteroid extends Character {
                 Canvas canvas = new Canvas(frameWidth, frameHeight);
                 GraphicsContext gc = canvas.getGraphicsContext2D();
 
-                // Draw the specific frame from the sprite sheet
                 gc.drawImage(explodeSheet,
-                        i * frameWidth, 0,          // source position
-                        frameWidth, frameHeight,    // source dimensions
-                        0, 0,                       // destination position
-                        frameWidth, frameHeight);   // destination dimensions
+                        i * frameWidth, 0,
+                        frameWidth, frameHeight,
+                        0, 0,
+                        frameWidth, frameHeight);
 
-                // Create transparent snapshot
                 SnapshotParameters params = new SnapshotParameters();
                 params.setFill(Color.TRANSPARENT);
                 Image frame = canvas.snapshot(params, null);
@@ -112,33 +160,6 @@ public class Asteroid extends Character {
                 })
         );
         explosionAnimation.setCycleCount(explosionFrames.size());
-    }
-
-    private void initializeVelocity() {
-        double speed = size == 1 ? SMALL_SPEED : LARGE_SPEED;
-        double angle = Math.random() * 2 * Math.PI;
-        this.velocity = new Point2D(
-                Math.cos(angle) * speed,
-                Math.sin(angle) * speed
-        );
-    }
-
-
-
-    @Override
-    public void update() {
-        if (!isExploding) {
-            // Update position
-            super.update();
-
-            // Update rotation
-            rotation += rotationSpeed;
-
-            // Keep rotation between 0 and 360 degrees
-            if (rotation >= 360) {
-                rotation -= 360;
-            }
-        }
     }
 
     public void explode() {
@@ -180,13 +201,6 @@ public class Asteroid extends Character {
     }
 
     @Override
-    protected void updateSpritePosition() {
-        if (!isExploding) {
-            super.updateSpritePosition();
-        }
-    }
-
-    @Override
     public void setPosition(Point2D newPosition) {
         this.position = newPosition;
         if (!isExploding) {
@@ -201,6 +215,7 @@ public class Asteroid extends Character {
     public double getRadius() {
         return this.size == 1 ? SMALL_RADIUS : LARGE_RADIUS;
     }
+
     // Resource cleanup
     public void dispose() {
         if (explosionAnimation != null) {

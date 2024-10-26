@@ -8,7 +8,6 @@ import javafx.animation.KeyFrame;
 import javafx.util.Duration;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import java.util.ArrayList;
 import java.util.List;
 import se233.asteroid.util.SpriteSheetUtils;
 
@@ -16,14 +15,10 @@ public class PlayerShip extends Character {
     private static final Logger logger = LogManager.getLogger(PlayerShip.class);
 
     // Movement constants
-    private static final double MOVEMENT_SPEED = 5.0;
+    private static final double ACCELERATION = 0.5;
     private static final double ROTATION_SPEED = 5.0;
     private static final double FRICTION = 0.98;
     private static final double MAX_SPEED = 10.0;
-
-    // Screen boundaries
-    private static final double SCREEN_WIDTH = 800.0;
-    private static final double SCREEN_HEIGHT = 600.0;
 
     // Ship states
     private int lives;
@@ -48,73 +43,93 @@ public class PlayerShip extends Character {
     private static final String SHIP_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Spaceships.png";
     private static final String THRUSTER_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Thruster_01.png";
     private static final String EXPLOSION_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Explosion.png";
-    private static final String SHIELD_EFFECT_PATH = "/se233/asteroid/assets/PlayerShip/Fx_01.png";
+    private static final String SHIELD_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Spaceships_LightMask.png";
 
     public PlayerShip(Point2D startPosition) {
-        super(SHIP_SPRITE_PATH, startPosition, 20);  // 20 is the collision radius
+        super(SHIP_SPRITE_PATH, startPosition, 20);
+        initializeShip();
+        initializeSprites();  // Move this before setupAnimations
+        setupAnimations();
+    }
+
+    private void initializeShip() {
         this.lives = 3;
         this.isThrusting = false;
         this.isExploding = false;
         this.isInvulnerable = false;
         this.isAlive = true;
-        this.position = startPosition;
-        this.velocity = new Point2D(0, 0);
-        this.rotation = 0;
 
-        initializeSprites();
-        setupAnimations();
-
-        logger.info("PlayerShip created with {} lives at position: {}", lives, startPosition);
+        logger.info("PlayerShip initialized with {} lives", lives);
     }
 
     private void initializeSprites() {
         try {
-            // Initialize main ship sprite
-            sprite.setFitWidth(40);  // Set appropriate size for ship
+            // Setup main ship sprite size
+            sprite.setFitWidth(40);
             sprite.setFitHeight(40);
             sprite.setPreserveRatio(true);
 
-            // Initialize thruster sprite
-            Image thrusterImage = new Image(getClass().getResourceAsStream(THRUSTER_SPRITE_PATH));
-            thrusterSprite = new ImageView(thrusterImage);
-            thrusterSprite.setFitWidth(30);  // Slightly smaller than ship
+            // Initialize thruster sprite with error checking
+            var thrusterStream = getClass().getResourceAsStream(THRUSTER_SPRITE_PATH);
+            if (thrusterStream == null) {
+                throw new RuntimeException("Could not find thruster sprite: " + THRUSTER_SPRITE_PATH);
+            }
+            thrusterSprite = new ImageView(new Image(thrusterStream));
+            thrusterSprite.setFitWidth(30);
             thrusterSprite.setFitHeight(30);
             thrusterSprite.setPreserveRatio(true);
             thrusterSprite.setVisible(false);
 
-            // Load animation frames
-            explosionFrames = loadExplosionFrames();
-            thrusterFrames = loadThrusterFrames();
-
-            // Initialize shield effect
-            Image shieldImage = new Image(getClass().getResourceAsStream(SHIELD_EFFECT_PATH));
-            shieldSprite = new ImageView(shieldImage);
-            shieldSprite.setFitWidth(60);  // Larger than ship to encompass it
+            // Initialize shield sprite with error checking
+            var shieldStream = getClass().getResourceAsStream(SHIELD_SPRITE_PATH);
+            if (shieldStream == null) {
+                throw new RuntimeException("Could not find shield sprite: " + SHIELD_SPRITE_PATH);
+            }
+            shieldSprite = new ImageView(new Image(shieldStream));
+            shieldSprite.setFitWidth(60);
             shieldSprite.setFitHeight(60);
             shieldSprite.setPreserveRatio(true);
             shieldSprite.setVisible(false);
 
+            // Load animation frames with error checking
+            var explosionStream = getClass().getResourceAsStream(EXPLOSION_SPRITE_PATH);
+            if (explosionStream == null) {
+                throw new RuntimeException("Could not find explosion sprite: " + EXPLOSION_SPRITE_PATH);
+            }
+            explosionFrames = SpriteSheetUtils.extractFrames(EXPLOSION_SPRITE_PATH, 8, false);
+            if (explosionFrames == null || explosionFrames.isEmpty()) {
+                throw new RuntimeException("Failed to extract explosion frames");
+            }
+
+            var thrusterAnimStream = getClass().getResourceAsStream(THRUSTER_SPRITE_PATH);
+            if (thrusterAnimStream == null) {
+                throw new RuntimeException("Could not find thruster animation sprite: " + THRUSTER_SPRITE_PATH);
+            }
+            thrusterFrames = SpriteSheetUtils.extractFrames(THRUSTER_SPRITE_PATH, 4, false);
+            if (thrusterFrames == null || thrusterFrames.isEmpty()) {
+                throw new RuntimeException("Failed to extract thruster frames");
+            }
+
             logger.debug("All sprites initialized successfully");
         } catch (Exception e) {
             logger.error("Failed to initialize sprites", e);
+            throw new RuntimeException("Failed to initialize ship sprites", e);
         }
     }
 
-    private List<Image> loadExplosionFrames() {
-        return SpriteSheetUtils.extractFrames(EXPLOSION_SPRITE_PATH, 8, false);
-    }
-
-    private List<Image> loadThrusterFrames() {
-        return SpriteSheetUtils.extractFrames(THRUSTER_SPRITE_PATH, 4, false);
-    }
-
     private void setupAnimations() {
-        // Setup explosion animation
+        if (explosionFrames == null || explosionFrames.isEmpty()) {
+            throw new RuntimeException("Explosion frames not initialized");
+        }
+        if (thrusterFrames == null || thrusterFrames.isEmpty()) {
+            throw new RuntimeException("Thruster frames not initialized");
+        }
+
+        // Explosion animation
         explosionAnimation = new Timeline(
                 new KeyFrame(Duration.millis(100), e -> {
                     if (currentExplosionFrame < explosionFrames.size()) {
-                        sprite.setImage(explosionFrames.get(currentExplosionFrame));
-                        currentExplosionFrame++;
+                        sprite.setImage(explosionFrames.get(currentExplosionFrame++));
                     } else {
                         explosionAnimation.stop();
                         respawn();
@@ -123,7 +138,7 @@ public class PlayerShip extends Character {
         );
         explosionAnimation.setCycleCount(explosionFrames.size());
 
-        // Setup thruster animation
+        // Thruster animation
         thrusterAnimation = new Timeline(
                 new KeyFrame(Duration.millis(100), e -> {
                     if (isThrusting) {
@@ -134,14 +149,14 @@ public class PlayerShip extends Character {
         );
         thrusterAnimation.setCycleCount(Timeline.INDEFINITE);
 
-        // Setup invulnerability blinking
+        // Invulnerability animation
         invulnerabilityAnimation = new Timeline(
                 new KeyFrame(Duration.millis(100), e -> {
                     sprite.setVisible(!sprite.isVisible());
                     shieldSprite.setVisible(sprite.isVisible());
                 })
         );
-        invulnerabilityAnimation.setCycleCount(30); // 3 seconds of blinking
+        invulnerabilityAnimation.setCycleCount(30);
     }
 
     @Override
@@ -150,24 +165,13 @@ public class PlayerShip extends Character {
             // Apply friction
             velocity = velocity.multiply(FRICTION);
 
-            // Limit maximum speed
+            // Limit speed
             if (velocity.magnitude() > MAX_SPEED) {
                 velocity = velocity.normalize().multiply(MAX_SPEED);
             }
 
             // Update position
-            position = position.add(velocity);
-
-            // Handle screen wrapping
-            position = new Point2D(
-                    (position.getX() + SCREEN_WIDTH) % SCREEN_WIDTH,
-                    (position.getY() + SCREEN_HEIGHT) % SCREEN_HEIGHT
-            );
-
-            // Update sprite positions
-            sprite.setTranslateX(position.getX() - sprite.getBoundsInLocal().getWidth()/2);
-            sprite.setTranslateY(position.getY() - sprite.getBoundsInLocal().getHeight()/2);
-            sprite.setRotate(rotation);
+            super.update();
 
             // Update auxiliary sprites
             if (isThrusting) {
@@ -182,72 +186,20 @@ public class PlayerShip extends Character {
     private void updateThrusterPosition() {
         double radians = Math.toRadians(rotation - 90);
         Point2D thrusterOffset = new Point2D(Math.cos(radians) * -20, Math.sin(radians) * -20);
-        thrusterSprite.setTranslateX(position.getX() + thrusterOffset.getX() - thrusterSprite.getBoundsInLocal().getWidth()/2);
-        thrusterSprite.setTranslateY(position.getY() + thrusterOffset.getY() - thrusterSprite.getBoundsInLocal().getHeight()/2);
+        thrusterSprite.setTranslateX(position.getX() + thrusterOffset.getX() - thrusterSprite.getBoundsInLocal().getWidth() / 2);
+        thrusterSprite.setTranslateY(position.getY() + thrusterOffset.getY() - thrusterSprite.getBoundsInLocal().getHeight() / 2);
         thrusterSprite.setRotate(rotation);
     }
 
     private void updateShieldPosition() {
-        shieldSprite.setTranslateX(position.getX() - shieldSprite.getBoundsInLocal().getWidth()/2);
-        shieldSprite.setTranslateY(position.getY() - shieldSprite.getBoundsInLocal().getHeight()/2);
+        shieldSprite.setTranslateX(position.getX() - shieldSprite.getBoundsInLocal().getWidth() / 2);
+        shieldSprite.setTranslateY(position.getY() - shieldSprite.getBoundsInLocal().getHeight() / 2);
         shieldSprite.setRotate(rotation);
-    }
-
-    public void thrust() {
-        if (!isExploding && isAlive) {
-            isThrusting = true;
-            thrusterSprite.setVisible(true);
-            double radians = Math.toRadians(rotation - 90);
-            Point2D thrustVector = new Point2D(Math.cos(radians), Math.sin(radians)).multiply(MOVEMENT_SPEED);
-            velocity = velocity.add(thrustVector);
-            thrusterAnimation.play();
-            logger.debug("Thrusting in direction: {} degrees", rotation);
-        }
-    }
-
-    public void moveLeft() {
-        if (!isExploding && isAlive) {
-            // Add velocity in the left direction
-            velocity = velocity.add(new Point2D(-MOVEMENT_SPEED, 0));
-
-            // Apply speed limit
-            if (velocity.magnitude() > MAX_SPEED) {
-                velocity = velocity.normalize().multiply(MAX_SPEED);
-            }
-
-            // Update rotation to face movement direction
-            rotation = 270;
-            logger.debug("Moving left with velocity: {}", velocity);
-        }
-    }
-
-    public void moveRight() {
-        if (!isExploding && isAlive) {
-            // Add velocity in the right direction
-            velocity = velocity.add(new Point2D(MOVEMENT_SPEED, 0));
-
-            // Apply speed limit
-            if (velocity.magnitude() > MAX_SPEED) {
-                velocity = velocity.normalize().multiply(MAX_SPEED);
-            }
-
-            // Update rotation to face movement direction
-            rotation = 90;
-            logger.debug("Moving right with velocity: {}", velocity);
-        }
     }
 
     public void moveUp() {
         if (!isExploding && isAlive) {
-            // Add velocity in the upward direction
-            velocity = velocity.add(new Point2D(0, -MOVEMENT_SPEED));
-
-            // Apply speed limit
-            if (velocity.magnitude() > MAX_SPEED) {
-                velocity = velocity.normalize().multiply(MAX_SPEED);
-            }
-
-            // Update rotation to face movement direction
+            velocity = velocity.add(new Point2D(0, -ACCELERATION));
             rotation = 0;
             logger.debug("Moving up with velocity: {}", velocity);
         }
@@ -255,17 +207,42 @@ public class PlayerShip extends Character {
 
     public void moveDown() {
         if (!isExploding && isAlive) {
-            // Add velocity in the downward direction
-            velocity = velocity.add(new Point2D(0, MOVEMENT_SPEED));
-
-            // Apply speed limit
-            if (velocity.magnitude() > MAX_SPEED) {
-                velocity = velocity.normalize().multiply(MAX_SPEED);
-            }
-
-            // Update rotation to face movement direction
+            velocity = velocity.add(new Point2D(0, ACCELERATION));
             rotation = 180;
             logger.debug("Moving down with velocity: {}", velocity);
+        }
+    }
+
+    public void moveLeft() {
+        if (!isExploding && isAlive) {
+            velocity = velocity.add(new Point2D(-ACCELERATION, 0));
+            rotation = 270;
+            logger.debug("Moving left with velocity: {}", velocity);
+        }
+    }
+
+    public void moveRight() {
+        if (!isExploding && isAlive) {
+            velocity = velocity.add(new Point2D(ACCELERATION, 0));
+            rotation = 90;
+            logger.debug("Moving right with velocity: {}", velocity);
+        }
+    }
+
+    public void thrust() {
+        if (!isExploding && isAlive) {
+            isThrusting = true;
+            thrusterSprite.setVisible(true);
+
+            double radians = Math.toRadians(rotation - 90);
+            Point2D thrustVector = new Point2D(
+                    Math.cos(radians) * ACCELERATION,
+                    Math.sin(radians) * ACCELERATION
+            );
+            velocity = velocity.add(thrustVector);
+
+            thrusterAnimation.play();
+            logger.debug("Thrusting in direction: {} degrees", rotation);
         }
     }
 
@@ -289,13 +266,14 @@ public class PlayerShip extends Character {
         }
     }
 
-    public Bullet shoot() {
+    public se233.asteroid.model.Bullet shoot() {
         if (!isExploding && isAlive) {
             double radians = Math.toRadians(rotation - 90);
             Point2D direction = new Point2D(Math.cos(radians), Math.sin(radians));
             Point2D bulletPosition = position.add(direction.multiply(sprite.getBoundsInLocal().getWidth() / 2));
             logger.info("Shooting bullet from position: {}", bulletPosition);
-            return new Bullet(bulletPosition, direction);
+            // Use the fully qualified class name to avoid confusion
+            return new se233.asteroid.model.Bullet(bulletPosition, direction, false);
         }
         return null;
     }
@@ -313,24 +291,6 @@ public class PlayerShip extends Character {
         }
     }
 
-    public void activateShield() {
-        if (isAlive && !isExploding) {
-            isInvulnerable = true;
-            shieldSprite.setVisible(true);
-
-            // Create a timer to deactivate the shield after a few seconds
-            Timeline shieldTimer = new Timeline(
-                    new KeyFrame(Duration.seconds(5), e -> {
-                        isInvulnerable = false;
-                        shieldSprite.setVisible(false);
-                    })
-            );
-            shieldTimer.play();
-
-            logger.debug("Shield activated");
-        }
-    }
-
     private void explode() {
         isExploding = true;
         currentExplosionFrame = 0;
@@ -342,7 +302,7 @@ public class PlayerShip extends Character {
     private void respawn() {
         if (lives > 0) {
             isExploding = false;
-            position = new Point2D(SCREEN_WIDTH/2, SCREEN_HEIGHT/2);
+            position = new Point2D(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
             velocity = new Point2D(0, 0);
             rotation = 0;
             startInvulnerability();
@@ -353,7 +313,6 @@ public class PlayerShip extends Character {
             logger.info("Game over - no lives remaining");
         }
     }
-
 
     private void startInvulnerability() {
         isInvulnerable = true;
@@ -368,16 +327,26 @@ public class PlayerShip extends Character {
         invulnerabilityTimer.play();
         logger.debug("Invulnerability started");
     }
-    public void addLife() {
-        if (isAlive) {
-            lives++;
-            logger.info("Extra life added. Total lives: {}", lives);
+
+    public void activateShield() {
+        if (isAlive && !isExploding) {
+            isInvulnerable = true;
+            shieldSprite.setVisible(true);
+
+            Timeline shieldTimer = new Timeline(
+                    new KeyFrame(Duration.seconds(5), e -> {
+                        isInvulnerable = false;
+                        shieldSprite.setVisible(false);
+                    })
+            );
+            shieldTimer.play();
+            logger.debug("Shield activated");
         }
     }
 
     public void reset() {
         lives = 3;
-        position = new Point2D(SCREEN_WIDTH/2, SCREEN_HEIGHT/2);
+        position = new Point2D(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
         velocity = new Point2D(0, 0);
         rotation = 0;
         isExploding = false;
@@ -390,22 +359,67 @@ public class PlayerShip extends Character {
         logger.info("Ship reset to initial state");
     }
 
-    // Getters
-    public int getLives() { return lives; }
-    public boolean isExploding() { return isExploding; }
-    public boolean isInvulnerable() { return isInvulnerable; }
-    public boolean isAlive() { return isAlive; }
-    public ImageView getThrusterSprite() { return thrusterSprite; }
-     public ImageView getShieldSprite() { return shieldSprite; }
-    public double getRadius() {
-        return 20.0; // หรือค่าอื่นที่เหมาะสม
-    }
-
-    // Clean up resources
     public void dispose() {
         if (explosionAnimation != null) explosionAnimation.stop();
         if (thrusterAnimation != null) thrusterAnimation.stop();
         if (invulnerabilityAnimation != null) invulnerabilityAnimation.stop();
         logger.info("PlayerShip resources disposed");
     }
+
+    public boolean isExploding() {
+        return isExploding;
+    }
+
+    public boolean isInvulnerable() {
+        return isInvulnerable;
+    }
+
+    public int getLives() {
+        return lives;
+    }
+
+    public boolean isAlive() {
+        return isAlive;
+    }
+
+
+    public ImageView getThrusterSprite() {
+        return thrusterSprite;
+    }
+
+    public ImageView getShieldSprite() {
+        return shieldSprite;
+    }
+
+    // Additional helper class - Bullet
+    public static class Bullet extends Character {
+        private static final double BULLET_SPEED = 10.0;
+        private static final String BULLET_SPRITE_PATH = "/assets/bullet.png";
+        private static final double BULLET_RADIUS = 2.0;
+        private static final double BULLET_LIFETIME = 2.0; // seconds
+        private double lifetime;
+
+        public Bullet(Point2D position, Point2D direction) {
+            super(BULLET_SPRITE_PATH, position, BULLET_RADIUS);
+            this.velocity = direction.multiply(BULLET_SPEED);
+            this.lifetime = BULLET_LIFETIME;
+
+            // Set bullet size
+            sprite.setFitWidth(4);
+            sprite.setFitHeight(4);
+        }
+
+        @Override
+        public void update() {
+            super.update();
+            lifetime -= 1.0 / 60.0; // Assuming 60 FPS
+        }
+
+        public boolean isExpired() {
+            return lifetime <= 0;
+        }
+    }
 }
+
+
+

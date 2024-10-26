@@ -22,7 +22,14 @@ public class GameController {
     private static final Logger logger = LogManager.getLogger(GameController.class);
     private static final double GAME_WIDTH = 800.0;
     private static final double GAME_HEIGHT = 600.0;
-    private static final long BULLET_COOLDOWN = 250_000_000; // 250ms in nanoseconds
+    private static final double BULLET_COOLDOWN = 250_000_000; // 250ms in nanoseconds
+
+    // Constants for asteroid spawning
+    private static final int INITIAL_ASTEROIDS = 5;
+    private static final double MIN_SPAWN_DISTANCE = 100.0;
+    private static final double SPAWN_CHANCE = 0.02; // 2% chance per frame
+    private static final int MIN_ASTEROIDS = 5;
+    private static final int MAX_WAVES = 3;
 
     private final Scene scene;
     private final GameStage gameStage;
@@ -30,9 +37,9 @@ public class GameController {
     private final Random random;
 
     private PlayerShip player;
-    private List<Asteroid> asteroids;  // Keep this as List<Asteroid> for type safety
+    private List<Asteroid> asteroids;
     private List<Bullet> bullets;
-    private Boss boss;  // Keep this as Boss for type safety
+    private Boss boss;
     private int currentWave = 1;
 
     private int score;
@@ -55,6 +62,12 @@ public class GameController {
         this.isGamePaused = false;
         this.gameOver = false;
 
+        setupButtonHandlers();
+        setupInputHandlers();
+        startGameLoop();
+    }
+
+    private void setupButtonHandlers() {
         gameStage.getStartButton().setOnAction(e -> {
             isGameStarted = true;
             gameStage.hideStartMenu();
@@ -62,47 +75,12 @@ public class GameController {
             logger.info("Game started via start button");
         });
 
-        // เพิ่ม Event Handler สำหรับปุ่ม Restart
         gameStage.getRestartButton().setOnAction(e -> {
             gameOver = false;
             gameStage.hideGameOver();
             setupGame();
             logger.info("Game restarted via restart button");
         });
-
-        setupInputHandlers();
-        startGameLoop();
-    }
-
-
-
-    private void checkCollisions() {
-        // Check bullet collisions
-        for (Bullet bullet : bullets) {
-            // Check asteroid collisions
-            for (Asteroid asteroid : asteroids) {
-                if (bullet.collidesWith(asteroid)) {
-                    handleAsteroidHit(asteroid, bullet);
-                }
-            }
-
-            // Check boss collision
-            if (boss != null && bullet.collidesWith(boss)) {
-                handleBossHit(bullet);
-            }
-        }
-
-        // Check player collisions with asteroids
-        for (Asteroid asteroid : asteroids) {
-            if (player.collidesWith(asteroid)) {
-                handlePlayerHit();
-            }
-        }
-
-        // Check player collision with boss
-        if (boss != null && player.collidesWith(boss)) {
-            handlePlayerHit();
-        }
     }
 
     private void setupInputHandlers() {
@@ -121,19 +99,16 @@ public class GameController {
 
     private void handleSpacePress() {
         if (!isGameStarted) {
-            // Start new game
             isGameStarted = true;
             gameStage.hideStartMenu();
             setupGame();
-            logger.info("Game started");
+            logger.info("Game started via space press");
         } else if (gameOver) {
-            // Restart game
             gameOver = false;
             setupGame();
-            logger.info("Game restarted");
+            logger.info("Game restarted via space press");
         }
     }
-
 
     private void togglePause() {
         if (gameLoop != null) {
@@ -151,33 +126,37 @@ public class GameController {
         }
     }
 
-
-
     private void setupGame() {
         clearAll();
-        // Reset game state
+        initializeGameState();
+        spawnInitialObjects();
+        if (gameLoop != null) {
+            gameLoop.start();
+        }
+        logger.info("Game setup completed for wave {}", currentWave);
+    }
+
+    private void initializeGameState() {
         asteroids.clear();
         bullets.clear();
         boss = null;
         score = 0;
-        currentWave = 1;  // Reset wave number
+        currentWave = 1;
         gameOver = false;
 
-        // Initialize player at center of screen
+        // Initialize player
         player = new PlayerShip(new Point2D(GAME_WIDTH / 2, GAME_HEIGHT / 2));
         gameStage.addGameObject(player);
+
+        // Update UI
         gameStage.updateScore(score);
         gameStage.updateLives(player.getLives());
-        gameStage.updateWave(currentWave);  // Update wave display
+        gameStage.updateWave(currentWave);
         gameStage.hideGameOver();
+    }
 
-        // Spawn initial asteroids
-        spawnAsteroids(5);
-        if (gameLoop != null) {
-            gameLoop.start();
-        }
-
-        logger.info("Game setup completed for wave {}", currentWave);
+    private void spawnInitialObjects() {
+        spawnAsteroids(INITIAL_ASTEROIDS + currentWave);
     }
 
     private void startGameLoop() {
@@ -187,13 +166,13 @@ public class GameController {
             @Override
             public void handle(long now) {
                 if (!isGameStarted || isGamePaused) {
-                    return;  // Don't update if game hasn't started or is paused
+                    return;
                 }
 
                 double deltaTime = (now - lastUpdateTime) / 1_000_000_000.0;
                 lastUpdateTime = now;
 
-                if (isGameStarted && !gameOver) {
+                if (!gameOver) {
                     handleInput(now);
                     updateGame(deltaTime);
                     checkCollisions();
@@ -207,10 +186,8 @@ public class GameController {
         logger.info("Game loop started");
     }
 
-
     private void handleInput(long currentTime) {
-        if (!isGameStarted || gameOver) return;  // Don't process game input if not started or game is over
-
+        // Player movement
         if (activeKeys.contains(KeyCode.A)) player.moveLeft();
         if (activeKeys.contains(KeyCode.D)) player.moveRight();
         if (activeKeys.contains(KeyCode.W)) player.moveUp();
@@ -218,7 +195,7 @@ public class GameController {
         if (activeKeys.contains(KeyCode.Q)) player.rotateLeft();
         if (activeKeys.contains(KeyCode.E)) player.rotateRight();
 
-        // Handle shooting with cooldown
+        // Shooting
         if (activeKeys.contains(KeyCode.SPACE) &&
                 (currentTime - lastBulletTime) >= BULLET_COOLDOWN) {
             Bullet bullet = player.shoot();
@@ -244,13 +221,12 @@ public class GameController {
             wrapPosition(asteroid);
         }
 
-        // Update boss if present
+        // Update boss
         if (boss != null) {
             boss.update(deltaTime, player.getPosition());
             wrapPosition(boss);
 
-            // Boss special attack with random chance
-            if (random.nextDouble() < 0.01) { // 1% chance per frame
+            if (random.nextDouble() < 0.01) { // Boss special attack
                 Bullet[] bossAttack = boss.shootSpecialAttack();
                 for (Bullet bullet : bossAttack) {
                     bullets.add(bullet);
@@ -259,33 +235,38 @@ public class GameController {
             }
         }
 
-        // Spawn boss when all asteroids are destroyed
+        // Check if it's time to spawn boss
         if (asteroids.isEmpty() && boss == null) {
             spawnBoss();
         }
     }
-    private void wrapPosition(se233.asteroid.model.Character character) {
-        Point2D position = character.getPosition();
-        double x = position.getX();
-        double y = position.getY();
 
-        if (x < 0) x = GAME_WIDTH;
-        if (x > GAME_WIDTH) x = 0;
-        if (y < 0) y = GAME_HEIGHT;
-        if (y > GAME_HEIGHT) y = 0;
-
-        character.setPosition(new Point2D(x, y));
-    }
-
-    private void cleanupObjects() {
-        // Remove bullets that are out of bounds
-        bullets.removeIf(bullet -> {
-            if (!isInBounds(bullet.getPosition())) {
-                gameStage.removeBullet(bullet);
-                return true;
+    private void checkCollisions() {
+        // Check bullet collisions
+        for (Bullet bullet : bullets) {
+            // Check asteroid collisions
+            for (Asteroid asteroid : asteroids) {
+                if (bullet.collidesWith(asteroid)) {
+                    handleAsteroidHit(asteroid, bullet);
+                }
             }
-            return false;
-        });
+
+            // Check boss collision
+            if (boss != null && bullet.collidesWith(boss)) {
+                handleBossHit(bullet);
+            }
+        }
+
+        // Check player collisions
+        for (Asteroid asteroid : asteroids) {
+            if (player.collidesWith(asteroid)) {
+                handlePlayerHit();
+            }
+        }
+
+        if (boss != null && player.collidesWith(boss)) {
+            handlePlayerHit();
+        }
     }
 
     private void handlePlayerHit() {
@@ -310,7 +291,16 @@ public class GameController {
         gameStage.removeGameObject(asteroid);
         gameStage.removeBullet(bullet);
 
+        // Show explosion and spawn smaller asteroids if applicable
         gameStage.showExplosion(asteroid.getPosition());
+        if (asteroid.getSize() == 2) { // Large asteroid
+            List<Asteroid> fragments = asteroid.split();
+            for (Asteroid fragment : fragments) {
+                asteroids.add(fragment);
+                gameStage.addGameObject(fragment);
+            }
+        }
+
         logger.info("Asteroid destroyed! Score: {}", score);
     }
 
@@ -325,12 +315,11 @@ public class GameController {
             gameStage.updateScore(score);
             gameStage.removeGameObject(boss);
 
-            // Increment wave and either start next wave or show victory
             currentWave++;
-            if (currentWave <= 3) {  // For example, limit to 3 waves
+            if (currentWave <= MAX_WAVES) {
                 boss = null;
                 gameStage.updateWave(currentWave);
-                spawnAsteroids(5 + currentWave);  // Increase difficulty with each wave
+                spawnAsteroids(INITIAL_ASTEROIDS + currentWave);
                 logger.info("Wave {} completed, starting next wave", currentWave - 1);
             } else {
                 gameStage.showVictory(score);
@@ -343,13 +332,14 @@ public class GameController {
     private void spawnAsteroids(int count) {
         for (int i = 0; i < count; i++) {
             Point2D position = getRandomSpawnPosition();
-            Asteroid asteroid = new Asteroid(position, 1);
+            // Randomly decide size (1 or 2)
+            int size = random.nextDouble() < 0.7 ? 1 : 2; // 70% small, 30% large
+            Asteroid asteroid = new Asteroid(position, size);
             asteroids.add(asteroid);
             gameStage.addGameObject(asteroid);
         }
     }
 
-    // Then modify the spawnBoss method
     private void spawnBoss() {
         Point2D position = new Point2D(GAME_WIDTH / 2, 100);
         boss = new Boss(position, currentWave);
@@ -358,29 +348,49 @@ public class GameController {
     }
 
     private void spawnNewAsteroids() {
-        if (asteroids.size() < 5 && boss == null && random.nextDouble() < 0.02) {
+        if (asteroids.size() < MIN_ASTEROIDS && boss == null && random.nextDouble() < SPAWN_CHANCE) {
             spawnAsteroids(1);
         }
     }
 
     private Point2D getRandomSpawnPosition() {
-        // Spawn objects away from the player
         double x, y;
         do {
             x = random.nextDouble() * GAME_WIDTH;
             y = random.nextDouble() * GAME_HEIGHT;
-        } while (new Point2D(x, y).distance(player.getPosition()) < 100);
-        // or alternatively:
-        // } while (player.getPosition().distance(x, y) < 100);
-
+        } while (new Point2D(x, y).distance(player.getPosition()) < MIN_SPAWN_DISTANCE);
         return new Point2D(x, y);
     }
+
+    private void wrapPosition(se233.asteroid.model.Character character) {
+        Point2D position = character.getPosition();
+        double x = position.getX();
+        double y = position.getY();
+
+        if (x < 0) x = GAME_WIDTH;
+        if (x > GAME_WIDTH) x = 0;
+        if (y < 0) y = GAME_HEIGHT;
+        if (y > GAME_HEIGHT) y = 0;
+
+        character.setPosition(new Point2D(x, y));
+    }
+
     private boolean isInBounds(Point2D position) {
         return position.getX() >= 0 && position.getX() <= GAME_WIDTH &&
                 position.getY() >= 0 && position.getY() <= GAME_HEIGHT;
     }
+
+    private void cleanupObjects() {
+        bullets.removeIf(bullet -> {
+            if (!isInBounds(bullet.getPosition())) {
+                gameStage.removeBullet(bullet);
+                return true;
+            }
+            return false;
+        });
+    }
+
     public void clearAll() {
-        // Remove all existing game objects from the view
         if (player != null) {
             gameStage.removeGameObject(player);
         }
