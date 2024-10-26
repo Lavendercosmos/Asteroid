@@ -12,7 +12,7 @@ public class Bullet extends Character {
     Shape shape;
 
     public Bullet(Point2D position, Point2D direction) {
-        super("/se233/asteroid/assets/Sprites/bullet.png", position, 5);
+        super("src/main/resources/se233/asteroid/assets/PlayerShip/Fx_01.png", position, 5);
         this.velocity = direction.normalize().multiply(BULLET_SPEED);
         logger.debug("Bullet created at position: {} with velocity: {}", position, velocity);
     }
@@ -21,6 +21,10 @@ public class Bullet extends Character {
     public void update() {
         super.update();
         // Additional bullet-specific update logic could go here
+    }
+
+    public double getRadius() {
+        return 5.0; // หรือค่าอื่นที่เหมาะสม
     }
 
     public Shape getShape() {

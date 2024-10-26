@@ -5,6 +5,10 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.paint.Color;
+import javafx.scene.Group;
 
 public abstract class Character {
     private static final Logger logger = LogManager.getLogger(Character.class);
@@ -15,6 +19,7 @@ public abstract class Character {
     protected ImageView sprite;
     protected double hitRadius;
     protected boolean isAlive;
+    protected boolean debugMode = false;
 
     public Character(String spritePath, Point2D position, double hitRadius) {
         try {
@@ -94,5 +99,6 @@ public abstract class Character {
         if (sprite != null) {
             sprite.setRotate(rotation);
         }
+
     }
 }

@@ -10,9 +10,10 @@ public class Boss extends Character {
     private int attackPattern = 0;
     private double timeSinceLastAttack = 0;
     private int health ;
-    public Boss(Point2D position) {
+
+    public Boss(Point2D position, int wave) {
         super("/se233/asteroid/assets/Sprites/boss.png", position, 50);
-        health = 200;
+        health = 200 * wave; // Scale health with wave number
         logger.info("Boss created at position: {} with health: {}", position, health);
     }
 
@@ -89,4 +90,7 @@ public class Boss extends Character {
 
     public int getPoints() { return POINTS; }
     public double getHealth() { return health; }
+    public double getRadius() {
+        return 30.0; // หรือค่าอื่นที่เหมาะสม
+    }
 }

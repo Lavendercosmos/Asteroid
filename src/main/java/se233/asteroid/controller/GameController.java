@@ -8,7 +8,7 @@ import se233.asteroid.model.PlayerShip;
 import se233.asteroid.model.Bullet;
 import se233.asteroid.model.Asteroid;
 import se233.asteroid.model.Boss;
-import se233.asteroid.display.GameStage;
+import se233.asteroid.view.GameStage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -33,6 +33,7 @@ public class GameController {
     private List<Asteroid> asteroids;  // Keep this as List<Asteroid> for type safety
     private List<Bullet> bullets;
     private Boss boss;  // Keep this as Boss for type safety
+    private int currentWave = 1;
 
     private int score;
     private boolean gameOver;
@@ -150,13 +151,16 @@ public class GameController {
         }
     }
 
+
+
     private void setupGame() {
         clearAll();
-    // Reset game state
+        // Reset game state
         asteroids.clear();
         bullets.clear();
         boss = null;
         score = 0;
+        currentWave = 1;  // Reset wave number
         gameOver = false;
 
         // Initialize player at center of screen
@@ -164,7 +168,8 @@ public class GameController {
         gameStage.addGameObject(player);
         gameStage.updateScore(score);
         gameStage.updateLives(player.getLives());
-        gameStage.hideGameOver();  // Hide any existing game over/victory messages
+        gameStage.updateWave(currentWave);  // Update wave display
+        gameStage.hideGameOver();
 
         // Spawn initial asteroids
         spawnAsteroids(5);
@@ -172,7 +177,7 @@ public class GameController {
             gameLoop.start();
         }
 
-        logger.info("Game setup completed");
+        logger.info("Game setup completed for wave {}", currentWave);
     }
 
     private void startGameLoop() {
@@ -319,9 +324,19 @@ public class GameController {
             score += boss.getPoints();
             gameStage.updateScore(score);
             gameStage.removeGameObject(boss);
-            gameStage.showVictory(score);
-            gameOver = true;
-            logger.info("Boss defeated! Final score: {}", score);
+
+            // Increment wave and either start next wave or show victory
+            currentWave++;
+            if (currentWave <= 3) {  // For example, limit to 3 waves
+                boss = null;
+                gameStage.updateWave(currentWave);
+                spawnAsteroids(5 + currentWave);  // Increase difficulty with each wave
+                logger.info("Wave {} completed, starting next wave", currentWave - 1);
+            } else {
+                gameStage.showVictory(score);
+                gameOver = true;
+                logger.info("Game completed! Final score: {}", score);
+            }
         }
     }
 
@@ -334,11 +349,12 @@ public class GameController {
         }
     }
 
+    // Then modify the spawnBoss method
     private void spawnBoss() {
         Point2D position = new Point2D(GAME_WIDTH / 2, 100);
-        boss = new Boss(position);
+        boss = new Boss(position, currentWave);
         gameStage.addGameObject(boss);
-        logger.info("Boss spawned!");
+        logger.info("Boss spawned for wave {}!", currentWave);
     }
 
     private void spawnNewAsteroids() {
