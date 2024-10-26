@@ -3,6 +3,7 @@ package se233.asteroid.view;
 import javafx.animation.*;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -14,6 +15,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
@@ -514,35 +516,72 @@ public class GameStage extends Pane {
 
     public void showExplosion(Point2D position) {
         try {
+            // Load explosion sprite sheet
             Image explosionImage = new Image(Objects.requireNonNull(
-                    getClass().getResourceAsStream("/se233/asteroid/assets/effects/explosion.png")
+                    getClass().getResourceAsStream("/se233/asteroid/assets/PlayerShip/Explosion.png")
             ));
+
             ImageView explosionView = new ImageView(explosionImage);
 
             // Convert to screen coordinates and scale
             Point2D screenPos = gameToScreen(position);
-            double scaledWidth = explosionImage.getWidth() * scale.getX();
-            double scaledHeight = explosionImage.getHeight() * scale.getY();
+            double scaledSize = 100 * scale.getX(); // Base size for explosion
 
-            explosionView.setX(screenPos.getX() - scaledWidth/2);
-            explosionView.setY(screenPos.getY() - scaledHeight/2);
-            explosionView.setFitWidth(scaledWidth);
-            explosionView.setFitHeight(scaledHeight);
+            explosionView.setX(screenPos.getX() - scaledSize/2);
+            explosionView.setY(screenPos.getY() - scaledSize/2);
+            explosionView.setFitWidth(scaledSize);
+            explosionView.setFitHeight(scaledSize);
 
             effectLayer.getChildren().add(explosionView);
 
-            double animationSpeed = 0.5 / Math.max(scale.getX(), scale.getY());
+            // Create explosion animation timeline
+            Timeline explosionAnimation = new Timeline();
+
+            // 8 frames of animation
+            for(int i = 0; i < 8; i++) {
+                KeyFrame frame = new KeyFrame(
+                        Duration.seconds(i * 0.05), // 50ms per frame
+                        new KeyValue(explosionView.viewportProperty(),
+                                new Rectangle2D(i * 100, 0, 100, 100))
+                );
+                explosionAnimation.getKeyFrames().add(frame);
+            }
+
+            // Add scaling and fade effects
             ParallelTransition animation = new ParallelTransition(
-                    createFadeTransition(explosionView, 1.0, 0.0, animationSpeed),
-                    createScaleTransition(explosionView, 0.5, 1.5, animationSpeed),
-                    createRotateTransition(explosionView, 90, animationSpeed)
+                    explosionAnimation,
+                    createScaleTransition(explosionView, 0.5, 1.5, 0.4),
+                    createFadeTransition(explosionView, 1.0, 0.0, 0.4)
             );
+
             animation.setOnFinished(e -> effectLayer.getChildren().remove(explosionView));
             animation.play();
 
         } catch (Exception e) {
             logger.error("Failed to show explosion effect", e);
+            // Fallback to simple explosion effect
+            createSimpleExplosionEffect(position);
         }
+    }
+
+    private void createSimpleExplosionEffect(Point2D position) {
+        Circle explosionCircle = new Circle();
+        Point2D screenPos = gameToScreen(position);
+
+        explosionCircle.setCenterX(screenPos.getX());
+        explosionCircle.setCenterY(screenPos.getY());
+        explosionCircle.setRadius(20 * scale.getX());
+        explosionCircle.setFill(Color.ORANGE);
+
+        effectLayer.getChildren().add(explosionCircle);
+
+        ParallelTransition animation = new ParallelTransition(
+                createFadeTransition(explosionCircle, 1.0, 0.0, 0.4),
+                createScaleTransition(explosionCircle, 0.5, 1.5, 0.4)
+        );
+
+        animation.setOnFinished(e -> effectLayer.getChildren().remove(explosionCircle));
+        animation.play();
     }
 
     // Game state updates
