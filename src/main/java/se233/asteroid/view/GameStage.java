@@ -413,6 +413,32 @@ public class GameStage extends Pane {
         // Update other menu positions similarly
     }
 
+    private void updateScale() {
+        // Calculate scale based on current window dimensions
+        double parentWidth = getParent() != null ? getParent().getLayoutBounds().getWidth() : WINDOW_WIDTH;
+        double parentHeight = getParent() != null ? getParent().getLayoutBounds().getHeight() : WINDOW_HEIGHT;
+
+        scaleX = parentWidth / WINDOW_WIDTH;
+        scaleY = parentHeight / WINDOW_HEIGHT;
+
+        // Keep scale within bounds
+        double finalScale = Math.min(Math.max(Math.min(scaleX, scaleY), MIN_SCALE), MAX_SCALE);
+
+        // Update the scale transform
+        scale.setX(finalScale);
+        scale.setY(finalScale);
+
+        // Center the game stage
+        setTranslateX((parentWidth - WINDOW_WIDTH * finalScale) / 2);
+        setTranslateY((parentHeight - WINDOW_HEIGHT * finalScale) / 2);
+
+        // Update UI elements with new scale
+        updateUIElements();
+        updateBackgroundEffects();
+
+        logger.debug("Scale updated - new scale: {}", finalScale);
+    }
+
     // Coordinate conversion methods
     public Point2D screenToGame(Point2D screenPoint) {
         return new Point2D(
@@ -878,7 +904,7 @@ public class GameStage extends Pane {
         gameLayer.setEffect(null);
 
         // Reset scale if needed
-//        updateScale();
+        updateScale();
 
         logger.info("Game stage reset completed");
     }
