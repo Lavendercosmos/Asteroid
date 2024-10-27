@@ -43,7 +43,7 @@ public class PlayerShip extends Character {
     private static final String SHIP_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Spaceships.png";
     private static final String THRUSTER_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Thruster_01.png";
     private static final String EXPLOSION_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Explosion.png";
-    private static final String SHIELD_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Spaceships_LightMask.png";
+    private static final String SHIELD_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Shield.png";
 
     public PlayerShip(Point2D startPosition) {
         super(SHIP_SPRITE_PATH, startPosition, 20);
@@ -65,8 +65,8 @@ public class PlayerShip extends Character {
     private void initializeSprites() {
         try {
             // Setup main ship sprite size
-            sprite.setFitWidth(40);
-            sprite.setFitHeight(40);
+            sprite.setFitWidth(60);
+            sprite.setFitHeight(60);
             sprite.setPreserveRatio(true);
 
             // Initialize thruster sprite with error checking
@@ -390,7 +390,7 @@ public class PlayerShip extends Character {
     // Additional helper class - Bullet
     public static class Bullet extends Character {
         private static final double BULLET_SPEED = 10.0;
-        private static final String BULLET_SPRITE_PATH = "/assets/bullet.png";
+        private static final String BULLET_SPRITE_PATH = "src/main/resources/se233/asteroid/assets/PlayerShip/Fx_01.png";
         private static final double BULLET_RADIUS = 2.0;
         private static final double BULLET_LIFETIME = 2.0; // seconds
         private double lifetime;

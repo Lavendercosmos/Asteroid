@@ -12,7 +12,7 @@ public class Bullet extends Character {
     // Constants
     private static final double BULLET_SPEED = 10.0;
     private static final String BULLET_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Fx_01.png";
-    private static final double BULLET_SIZE = 5.0;
+    private static final double BULLET_SIZE = 8.0;
     private static final double BULLET_LIFETIME = 2.0; // seconds
     private static final int BULLET_DAMAGE = 10;
 
