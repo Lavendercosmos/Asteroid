@@ -15,10 +15,10 @@ public class PlayerShip extends Character {
     private static final Logger logger = LogManager.getLogger(PlayerShip.class);
 
     // Movement constants
-    private static final double ACCELERATION = 0.5;
-    private static final double ROTATION_SPEED = 5.0;
-    private static final double FRICTION = 0.98;
-    private static final double MAX_SPEED = 10.0;
+    private static final double ACCELERATION = 0.5; //ความเร่ง
+    private static final double ROTATION_SPEED = 2.0;
+    private static final double FRICTION = 0.98; //ความหน่วง
+    private static final double MAX_SPEED = 1.0;
 
     // Ship states
     private int lives;
@@ -200,7 +200,6 @@ public class PlayerShip extends Character {
     public void moveUp() {
         if (!isExploding && isAlive) {
             velocity = velocity.add(new Point2D(0, -ACCELERATION));
-            rotation = 0;
             logger.debug("Moving up with velocity: {}", velocity);
         }
     }
@@ -208,7 +207,6 @@ public class PlayerShip extends Character {
     public void moveDown() {
         if (!isExploding && isAlive) {
             velocity = velocity.add(new Point2D(0, ACCELERATION));
-            rotation = 180;
             logger.debug("Moving down with velocity: {}", velocity);
         }
     }
@@ -216,7 +214,6 @@ public class PlayerShip extends Character {
     public void moveLeft() {
         if (!isExploding && isAlive) {
             velocity = velocity.add(new Point2D(-ACCELERATION, 0));
-            rotation = 270;
             logger.debug("Moving left with velocity: {}", velocity);
         }
     }
@@ -224,27 +221,26 @@ public class PlayerShip extends Character {
     public void moveRight() {
         if (!isExploding && isAlive) {
             velocity = velocity.add(new Point2D(ACCELERATION, 0));
-            rotation = 90;
             logger.debug("Moving right with velocity: {}", velocity);
         }
     }
 
-    public void thrust() {
-        if (!isExploding && isAlive) {
-            isThrusting = true;
-            thrusterSprite.setVisible(true);
-
-            double radians = Math.toRadians(rotation - 90);
-            Point2D thrustVector = new Point2D(
-                    Math.cos(radians) * ACCELERATION,
-                    Math.sin(radians) * ACCELERATION
-            );
-            velocity = velocity.add(thrustVector);
-
-            thrusterAnimation.play();
-            logger.debug("Thrusting in direction: {} degrees", rotation);
-        }
-    }
+//    public void thrust() {
+//        if (!isExploding && isAlive) {
+//            isThrusting = true;
+//            thrusterSprite.setVisible(true);
+//
+//            double radians = Math.toRadians(rotation - 90);
+//            Point2D thrustVector = new Point2D(
+//                    Math.cos(radians) * ACCELERATION,
+//                    Math.sin(radians) * ACCELERATION
+//            );
+//            velocity = velocity.add(thrustVector);
+//
+//            thrusterAnimation.play();
+//            logger.debug("Thrusting in direction: {} degrees", rotation);
+//        }
+//    }
 
     public void stopThrust() {
         isThrusting = false;
