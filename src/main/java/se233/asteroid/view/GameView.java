@@ -328,7 +328,7 @@ public class GameView extends Pane {
     public void moveDown() { if (player != null) player.moveDown(); }
     public void rotateLeft() { if (player != null) player.rotateLeft(); }
     public void rotateRight() { if (player != null) player.rotateRight(); }
-    public void thrust() { if (player != null) player.thrust(); }
+    //public void thrust() { if (player != null) player.thrust(); }
     public void stopThrust() { if (player != null) player.stopThrust(); }
 
     // Window resize handling
