@@ -35,7 +35,7 @@ public class GameStage extends Pane {
 
     // Constants
     public static double WINDOW_WIDTH = 800;
-    public static double WINDOW_HEIGHT = 600;
+    public static double WINDOW_HEIGHT = 625;
     private static final String STYLE_HEADER = "-fx-font-family: 'Press Start 2P', Arial; -fx-font-size: 48px; -fx-fill: white; -fx-stroke: #4a90e2; -fx-stroke-width: 2px;";
     private static final String STYLE_NORMAL = "-fx-font-family: Arial; -fx-font-size: 24px; -fx-fill: white;";
     private static final double MIN_SCALE = 0.5;
