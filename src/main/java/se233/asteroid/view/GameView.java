@@ -153,12 +153,11 @@ public class GameView extends Pane {
         gameStage.showExplosion(asteroid.getPosition());
 
         if (!asteroid.isAlive()) {
-            if (asteroid.getSize() > 1) {
-                for (Asteroid fragment : asteroid.split()) {
-                    addGameObject(fragment);
-                }
+            // สร้าง fragments เมื่ออุกาบาตถูกทำลาย
+            for (Asteroid fragment : asteroid.split()) {
+                addGameObject(fragment);
             }
-            increaseScore(100 * asteroid.getSize());
+            increaseScore(100); // คะแนนคงที่สำหรับการทำลายอุกาบาต
         }
     }
 
@@ -235,7 +234,19 @@ public class GameView extends Pane {
 
     }
 
+    private void spawnAsteroid() {
+        double x = Math.random() * DEFAULT_WIDTH;
+        double y = Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50;
+        Point2D spawnPos = new Point2D(x, y);
+
+        // สร้างอุกาบาตขนาดเดียว
+        Asteroid asteroid = new Asteroid(spawnPos);
+        addGameObject(asteroid);
+    }
+
+
     private void spawnAsteroids() {
+        // ปรับจำนวนอุกาบาตตาม wave
         int baseCount = 4;
         int additionalCount = (currentWave - 1) * 2;
         int totalCount = Math.min(baseCount + additionalCount, 12);
@@ -243,17 +254,7 @@ public class GameView extends Pane {
         for (int i = 0; i < totalCount; i++) {
             spawnAsteroid();
         }
-    }
-
-    private void spawnAsteroid() {
-        double x = Math.random() * DEFAULT_WIDTH;
-        double y = Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50;
-        Point2D spawnPos = new Point2D(x, y);
-
-        // สุ่มว่าจะสร้าง small (1) หรือ large (2) asteroid
-        int size = Math.random() < 0.7 ? 2 : 1;  // 70% จะเป็น large asteroid
-        Asteroid asteroid = new Asteroid(spawnPos, size);
-        addGameObject(asteroid);
+        logger.info("Spawned {} asteroids for wave {}", totalCount, currentWave);
     }
 
     private void increaseScore(int points) {
