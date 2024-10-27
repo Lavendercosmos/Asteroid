@@ -50,6 +50,13 @@ public class GameController {
     private AnimationTimer gameLoop;
     private boolean isGamePaused;
 
+    // คะแนนสำหรับการทำลายเป้าหมายต่างๆ
+    private static final int SMALL_ASTEROID_POINTS = 1;
+    private static final int LARGE_ASTEROID_POINTS = 2;
+    private static final int REGULAR_ENEMY_POINTS = 1;
+    private static final int SECOND_TIER_ENEMY_POINTS = 2;
+
+
     public GameController(Scene scene, GameStage gameStage) {
         this.scene = scene;
         this.gameStage = gameStage;
@@ -248,26 +255,25 @@ public class GameController {
             for (Asteroid asteroid : asteroids) {
                 if (bullet.collidesWith(asteroid)) {
                     handleAsteroidHit(asteroid, bullet);
+                    continue;  // หลังจากยิงโดนแล้ว ไม่ต้องเช็คการชนกับวัตถุอื่น
                 }
             }
+
+//            // Check enemy collisions
+//            for (Enemy enemy : enemies) {
+//                if (bullet.collidesWith(enemy)) {
+//                    handleEnemyHit(enemy, bullet);
+//                    continue;
+//                }
+//            }
 
             // Check boss collision
             if (boss != null && bullet.collidesWith(boss)) {
                 handleBossHit(bullet);
             }
         }
-
-        // Check player collisions
-        for (Asteroid asteroid : asteroids) {
-            if (player.collidesWith(asteroid)) {
-                handlePlayerHit();
-            }
-        }
-
-        if (boss != null && player.collidesWith(boss)) {
-            handlePlayerHit();
-        }
     }
+
 
     private void handlePlayerHit() {
         player.hit();
@@ -281,8 +287,12 @@ public class GameController {
         }
     }
 
+
+
     private void handleAsteroidHit(Asteroid asteroid, Bullet bullet) {
-        score += asteroid.getPoints();
+        // คำนวณคะแนนตามขนาดของ asteroid
+        int points = (asteroid.getSize() == 1) ? SMALL_ASTEROID_POINTS : LARGE_ASTEROID_POINTS;
+        score += points;
         gameStage.updateScore(score);
 
         // Remove asteroid and bullet
@@ -301,7 +311,15 @@ public class GameController {
             }
         }
 
-        logger.info("Asteroid destroyed! Score: {}", score);
+        logger.info("Asteroid size {} destroyed! Points awarded: {}, Total score: {}",
+                asteroid.getSize(), points, score);
+    }
+
+    private void spawnBoss() {
+        Point2D position = new Point2D(GAME_WIDTH / 2, 100);
+        boss = new Boss(position, currentWave);
+        gameStage.addGameObject(boss);
+        logger.info("Boss spawned for wave {}!", currentWave);
     }
 
     private void handleBossHit(Bullet bullet) {
@@ -311,9 +329,14 @@ public class GameController {
         gameStage.showExplosion(bullet.getPosition());
 
         if (!boss.isAlive()) {
-            score += boss.getPoints();
+            // Boss ให้คะแนนมากกว่าศัตรูธรรมดา
+            int bossPoints = SECOND_TIER_ENEMY_POINTS * 5;  // ตัวอย่าง: boss ให้ 10 คะแนน
+            score += bossPoints;
             gameStage.updateScore(score);
             gameStage.removeGameObject(boss);
+
+            logger.info("Boss destroyed! Points awarded: {}, Total score: {}",
+                    bossPoints, score);
 
             currentWave++;
             if (currentWave <= MAX_WAVES) {
@@ -340,12 +363,7 @@ public class GameController {
         }
     }
 
-    private void spawnBoss() {
-        Point2D position = new Point2D(GAME_WIDTH / 2, 100);
-        boss = new Boss(position, currentWave);
-        gameStage.addGameObject(boss);
-        logger.info("Boss spawned for wave {}!", currentWave);
-    }
+
 
     private void spawnNewAsteroids() {
         if (asteroids.size() < MIN_ASTEROIDS && boss == null && random.nextDouble() < SPAWN_CHANCE) {
@@ -389,6 +407,7 @@ public class GameController {
             return false;
         });
     }
+
 
     public void clearAll() {
         if (player != null) {
