@@ -250,7 +250,9 @@ public class GameView extends Pane {
         double y = Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50;
         Point2D spawnPos = new Point2D(x, y);
 
-        Asteroid asteroid = new Asteroid(spawnPos, 3);
+        // สุ่มว่าจะสร้าง small (1) หรือ large (2) asteroid
+        int size = Math.random() < 0.7 ? 2 : 1;  // 70% จะเป็น large asteroid
+        Asteroid asteroid = new Asteroid(spawnPos, size);
         addGameObject(asteroid);
     }
 
