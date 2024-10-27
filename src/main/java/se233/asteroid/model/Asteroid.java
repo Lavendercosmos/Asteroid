@@ -2,7 +2,6 @@ package se233.asteroid.model;
 
 import javafx.geometry.Point2D;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.SnapshotParameters;
@@ -22,40 +21,40 @@ public class Asteroid extends Character {
     private static final String ASTEROID_BASE_PATH = "/se233/asteroid/assets/Astroides/Asteroid_Base.png";
     private static final String ASTEROID_EXPLODE_PATH = "/se233/asteroid/assets/Astroides/Asteroid_Explode.png";
 
-    // Constants
-    private static final double SMALL_SPEED = 3.0;
-    private static final double LARGE_SPEED = 2.0;
-    private static final double SMALL_ROTATION_SPEED = 2.0;
-    private static final double LARGE_ROTATION_SPEED = 1.0;
-    private static final double SMALL_RADIUS = 15;
-    private static final double LARGE_RADIUS = 30;
-    private static final int EXPLOSION_FRAMES = 8;
+    // Constants - simplified for small asteroids only
+    private static final double ASTEROID_SPEED = 1.0;
+    private static final double ROTATION_SPEED = 2.0;
+    private static final double ASTEROID_RADIUS = 30;
+    private static final int EXPLOSION_FRAMES = 5;
     private static final Duration FRAME_DURATION = Duration.millis(100);
 
     // Asteroid properties
-    private final int size; // 1 for small, 2 for large
     private final int points;
-    private final double rotationSpeed;
     private boolean isExploding;
     private List<Image> explosionFrames;
     private int currentExplosionFrame;
     private Timeline explosionAnimation;
     private double currentSpeed;
     private double directionAngle;
+    private boolean isInvulnerable;
+    private long invulnerableStartTime;
+    private static final long INVULNERABLE_DURATION = 500;
+    private double baseWidth;
+    private double baseHeight;
 
-    public Asteroid(Point2D position, int size) {
-        super(ASTEROID_BASE_PATH, position, size == 1 ? SMALL_RADIUS : LARGE_RADIUS);
-
-        this.size = size;
-        this.points = size;
-        this.rotationSpeed = size == 1 ? SMALL_ROTATION_SPEED : LARGE_ROTATION_SPEED;
+    public Asteroid(Point2D position) {
+        super(ASTEROID_BASE_PATH, position, ASTEROID_RADIUS);
+        this.isInvulnerable = false;
+        this.points = 100; // Fixed points for destroying asteroid
         this.isExploding = false;
-
-        // Initialize speed based on size
-        this.currentSpeed = size == 1 ? SMALL_SPEED : LARGE_SPEED;
+        this.currentSpeed = ASTEROID_SPEED;
 
         // Set random direction angle in radians
         this.directionAngle = Math.random() * 2 * Math.PI;
+
+        // Store original asteroid dimensions
+        this.baseWidth = sprite.getFitWidth();
+        this.baseHeight = sprite.getFitHeight();
 
         // Initialize explosion frames
         this.explosionFrames = loadExplosionFrames();
@@ -67,8 +66,8 @@ public class Asteroid extends Character {
         // Initialize velocity for continuous movement
         initializeVelocity();
 
-        logger.info("Created {} asteroid at position: {} with speed: {} and angle: {}°",
-                size == 1 ? "small" : "large", position, currentSpeed, Math.toDegrees(directionAngle));
+        logger.info("Created asteroid at position: {} with speed: {} and angle: {}°",
+                position, currentSpeed, Math.toDegrees(directionAngle));
     }
 
     private void initializeVelocity() {
@@ -78,21 +77,30 @@ public class Asteroid extends Character {
         this.velocity = new Point2D(vx, vy);
     }
 
-    public void hit() {
-        if (isAlive && !isExploding) {
-            logger.debug("Asteroid hit at position: {}", position);
-            explode();
+    public void setInvulnerable(boolean invulnerable) {
+        this.isInvulnerable = invulnerable;
+        if (invulnerable) {
+            this.invulnerableStartTime = System.currentTimeMillis();
         }
+    }
+
+    public boolean isInvulnerable() {
+        return isInvulnerable;
     }
 
     @Override
     public void update() {
+        // Check invulnerability timeout
+        if (isInvulnerable && System.currentTimeMillis() - invulnerableStartTime >= INVULNERABLE_DURATION) {
+            isInvulnerable = false;
+        }
+
         if (!isExploding) {
             // Update position based on current velocity
             position = position.add(velocity);
 
             // Update rotation
-            rotation += rotationSpeed;
+            rotation += ROTATION_SPEED;
             if (rotation >= 360) {
                 rotation -= 360;
             }
@@ -105,6 +113,62 @@ public class Asteroid extends Character {
                     position, velocity, rotation);
         }
     }
+
+    public void hit() {
+        if (isAlive && !isExploding) {
+            logger.debug("Asteroid hit at position: {}", position);
+            explode();
+        }
+    }
+
+    public List<Asteroid> split() {
+        List<Asteroid> fragments = new ArrayList<>();
+        double[] angles = {-45, 45}; // กำหนดทิศทางการกระจาย
+        double spreadDistance = 30.0; // ระยะห่างจากจุดเดิม
+
+        for (double angle : angles) {
+            // คำนวณตำแหน่งใหม่ให้ห่างจากจุดเดิม
+            double radians = Math.toRadians(angle);
+            Point2D offset = new Point2D(
+                    Math.cos(radians) * spreadDistance,
+                    Math.sin(radians) * spreadDistance
+            );
+            Point2D newPos = position.add(offset);
+
+            // สร้าง fragment ในตำแหน่งใหม่
+            Asteroid fragment = new Asteroid(newPos);
+            fragments.add(fragment);
+        }
+
+        logger.info("Asteroid split into {} fragments", fragments.size());
+        return fragments;
+    }
+
+    private void explode() {
+        if (!isExploding) {
+            isExploding = true;
+            currentExplosionFrame = 0;
+
+            // ไม่ต้องปรับขนาด sprite ให้ใหญ่ขึ้น ใช้ขนาดเดิม
+            sprite.setFitWidth(baseWidth );  // ใช้ขนาดเดิมของ asteroid
+            sprite.setFitHeight(baseHeight );
+
+            // ปรับตำแหน่งให้ centered
+            sprite.setTranslateX(position.getX() - sprite.getFitWidth()/2);
+            sprite.setTranslateY(position.getY() - sprite.getFitHeight()/2);
+
+            // Start explosion animation
+            explosionAnimation.play();
+
+            // ลบ sprite เมื่อ animation จบ
+            explosionAnimation.setOnFinished(event -> {
+                sprite.setVisible(false);  // ซ่อน sprite
+                sprite.setImage(null);     // ลบรูปภาพ
+                isAlive = false;           // ตั้งค่าว่าถูกทำลายแล้ว
+            });
+        }
+    }
+
 
     @Override
     protected void updateSpritePosition() {
@@ -122,23 +186,26 @@ public class Asteroid extends Character {
             double frameWidth = explodeSheet.getWidth() / EXPLOSION_FRAMES;
             double frameHeight = explodeSheet.getHeight();
 
+            // คำนวณ scale factor เพื่อให้ explosion มีขนาดเท่ากับ asteroid
+            double scaleX = baseWidth / frameWidth;
+            double scaleY = baseHeight / frameHeight;
+            double scale = Math.min(scaleX, scaleY);
+
             for (int i = 0; i < EXPLOSION_FRAMES; i++) {
-                Canvas canvas = new Canvas(frameWidth, frameHeight);
+                Canvas canvas = new Canvas(frameWidth * scale, frameHeight * scale);
                 GraphicsContext gc = canvas.getGraphicsContext2D();
 
                 gc.drawImage(explodeSheet,
                         i * frameWidth, 0,
                         frameWidth, frameHeight,
                         0, 0,
-                        frameWidth, frameHeight);
+                        frameWidth * scale, frameHeight * scale);
 
                 SnapshotParameters params = new SnapshotParameters();
                 params.setFill(Color.TRANSPARENT);
                 Image frame = canvas.snapshot(params, null);
                 frames.add(frame);
             }
-
-            logger.debug("Loaded {} explosion frames", frames.size());
 
         } catch (Exception e) {
             logger.error("Failed to load explosion frames", e);
@@ -151,54 +218,22 @@ public class Asteroid extends Character {
                 new KeyFrame(FRAME_DURATION, e -> {
                     if (currentExplosionFrame < explosionFrames.size()) {
                         sprite.setImage(explosionFrames.get(currentExplosionFrame));
+                        // Scale explosion frame to match original asteroid size
+                        sprite.setFitWidth(baseWidth);
+                        sprite.setFitHeight(baseHeight);
                         currentExplosionFrame++;
                     } else {
                         explosionAnimation.stop();
+                        sprite.setVisible(false);
+                        sprite.setImage(null);
                         isAlive = false;
-                        logger.debug("Explosion animation completed");
                     }
                 })
         );
         explosionAnimation.setCycleCount(explosionFrames.size());
     }
 
-    public void explode() {
-        if (!isExploding) {
-            isExploding = true;
-            currentExplosionFrame = 0;
 
-            // Adjust sprite size for explosion
-            sprite.setFitWidth(size == 1 ? SMALL_RADIUS * 4 : LARGE_RADIUS * 4);
-            sprite.setFitHeight(size == 1 ? SMALL_RADIUS * 4 : LARGE_RADIUS * 4);
-
-            // Center the explosion
-            sprite.setTranslateX(position.getX() - sprite.getFitWidth()/2);
-            sprite.setTranslateY(position.getY() - sprite.getFitHeight()/2);
-
-            // Start explosion animation
-            explosionAnimation.play();
-            logger.info("Started explosion animation for {} asteroid",
-                    size == 1 ? "small" : "large");
-        }
-    }
-
-    public List<Asteroid> split() {
-        List<Asteroid> fragments = new ArrayList<>();
-        if (size == 2) { // Only large asteroids split
-            for (int i = 0; i < 2; i++) {
-                // Create slightly offset positions for fragments
-                double offsetX = (Math.random() - 0.5) * 20;
-                double offsetY = (Math.random() - 0.5) * 20;
-                Point2D fragmentPos = new Point2D(
-                        position.getX() + offsetX,
-                        position.getY() + offsetY
-                );
-                fragments.add(new Asteroid(fragmentPos, 1));
-            }
-            logger.info("Large asteroid split into {} smaller fragments", fragments.size());
-        }
-        return fragments;
-    }
 
     @Override
     public void setPosition(Point2D newPosition) {
@@ -209,17 +244,33 @@ public class Asteroid extends Character {
     }
 
     // Getters
-    public int getSize() { return size; }
     public int getPoints() { return points; }
     public boolean isExploding() { return isExploding; }
-    public double getRadius() {
-        return this.size == 1 ? SMALL_RADIUS : LARGE_RADIUS;
-    }
+    public double getRadius() { return ASTEROID_RADIUS; }
 
     // Resource cleanup
     public void dispose() {
         if (explosionAnimation != null) {
             explosionAnimation.stop();
         }
+    }
+    @Override
+    public boolean collidesWith(Character other) {
+        // ตรวจสอบเงื่อนไขทั้งหมดที่ไม่ควรเกิดการชน
+        if (!isAlive || // ถ้าอุกาบาตถูกทำลายแล้ว
+                isExploding || // กำลังระเบิด
+                isInvulnerable || // อยู่ในสถานะไม่สามารถชนได้
+                !sprite.isVisible() || // sprite ไม่แสดงผล
+                other == null || // ไม่มีวัตถุที่จะชน
+                !other.isAlive()) { // วัตถุที่จะชนถูกทำลายแล้ว
+            return false;
+        }
+
+        // คำนวณระยะห่างระหว่างศูนย์กลางของวัตถุทั้งสอง
+        double distance = position.distance(other.getPosition());
+        double minDistance = getHitRadius() + other.getHitRadius(); // ใช้ hitRadius จาก Character class
+
+        // จะชนกันก็ต่อเมื่อระยะห่างน้อยกว่าผลรวมของรัศมีทั้งสอง
+        return distance < minDistance;
     }
 }
