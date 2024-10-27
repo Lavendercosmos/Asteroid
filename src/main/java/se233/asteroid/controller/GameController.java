@@ -12,10 +12,7 @@ import se233.asteroid.view.GameStage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.List;
-import java.util.Set;
-import java.util.Random;
-import java.util.HashSet;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class GameController {
@@ -51,8 +48,7 @@ public class GameController {
     private boolean isGamePaused;
 
     // คะแนนสำหรับการทำลายเป้าหมายต่างๆ
-    private static final int SMALL_ASTEROID_POINTS = 1;
-    private static final int LARGE_ASTEROID_POINTS = 2;
+    private static final int ASTEROID_POINTS = 1;
     private static final int REGULAR_ENEMY_POINTS = 1;
     private static final int SECOND_TIER_ENEMY_POINTS = 2;
 
@@ -249,31 +245,92 @@ public class GameController {
     }
 
     private void checkCollisions() {
-        // Check bullet collisions
-        for (Bullet bullet : bullets) {
+        // Check bullet collisions with asteroids
+        Iterator<Bullet> bulletIter = bullets.iterator();
+        while (bulletIter.hasNext()) {
+            Bullet bullet = bulletIter.next();
+            boolean bulletHit = false;
+
             // Check asteroid collisions
-            for (Asteroid asteroid : asteroids) {
-                if (bullet.collidesWith(asteroid)) {
-                    handleAsteroidHit(asteroid, bullet);
-                    continue;  // หลังจากยิงโดนแล้ว ไม่ต้องเช็คการชนกับวัตถุอื่น
+            Iterator<Asteroid> asteroidIter = asteroids.iterator();
+            while (asteroidIter.hasNext()) {
+                Asteroid asteroid = asteroidIter.next();
+
+                // ตรวจสอบว่าสามารถชนได้หรือไม่
+                if (!asteroid.isExploding() && !asteroid.isInvulnerable() && bullet.collidesWith(asteroid)) {
+                    // แสดง explosion effect
+                    gameStage.showExplosion(asteroid.getPosition());
+
+                    // ทำลายกระสุน
+                    bulletIter.remove();
+                    gameStage.removeBullet(bullet);
+                    bulletHit = true;
+
+                    // ทำลายอุกาบาต
+                    asteroid.hit();
+
+                    // สำคัญ: ลบอุกาบาตออกทันทีเมื่อถูกทำลาย
+                    if (!asteroid.isAlive()) {
+                        asteroidIter.remove();
+                        gameStage.removeGameObject(asteroid);
+
+                        // ให้คะแนน
+                        score += ASTEROID_POINTS;
+                        gameStage.updateScore(score);
+
+                        // สร้าง fragments ที่มีการ offset ตำแหน่งและตั้งค่า invulnerable
+                        List<Asteroid> fragments = asteroid.split();
+                        for (Asteroid fragment : fragments) {
+                            fragment.setInvulnerable(true);
+                            asteroids.add(fragment);
+                            gameStage.addGameObject(fragment);
+                        }
+
+                        logger.info("Asteroid destroyed! Points awarded: {}, Total score: {}",
+                                ASTEROID_POINTS, score);
+                    }
+                    break; // ออกจากการตรวจสอบอุกาบาตหลังจากพบการชน
                 }
             }
 
-//            // Check enemy collisions
-//            for (Enemy enemy : enemies) {
-//                if (bullet.collidesWith(enemy)) {
-//                    handleEnemyHit(enemy, bullet);
-//                    continue;
-//                }
-//            }
+            // ถ้ากระสุนชนแล้วให้ข้ามการตรวจสอบ boss
+            if (bulletHit) continue;
 
-            // Check boss collision
+            // Check boss collision if exists
             if (boss != null && bullet.collidesWith(boss)) {
                 handleBossHit(bullet);
             }
         }
+
+        // ทำความสะอาด list โดยลบอุกาบาตที่ถูกทำลายออก
+        asteroids.removeIf(asteroid -> !asteroid.isAlive());
+
+        // Check player collisions
+        checkPlayerCollisions();
     }
 
+    private void checkPlayerCollisions() {
+        if (player == null || !player.isAlive() || player.isInvulnerable()) return;
+
+        // Check player collisions with asteroids
+        for (Asteroid asteroid : asteroids) {
+            // ตรวจสอบการชนเฉพาะกับอุกาบาตที่:
+            if (asteroid.isAlive() && // ยังมีชีวิตอยู่
+                    !asteroid.isExploding() && // ไม่กำลังระเบิด
+                    !asteroid.isInvulnerable() && // ไม่อยู่ในสถานะ invulnerable
+                    asteroid.getSprite().isVisible() && // sprite ยังแสดงผลอยู่
+                    player.collidesWith(asteroid)) { // มีการชนเกิดขึ้น
+
+                handlePlayerHit();
+                break;
+            }
+        }
+
+        // Check player collision with boss
+        if (boss != null && boss.isAlive() && player.collidesWith(boss)) {
+            handlePlayerHit();
+        }
+    }
 
     private void handlePlayerHit() {
         player.hit();
@@ -282,37 +339,38 @@ public class GameController {
 
         if (!player.isAlive()) {
             gameOver = true;
+
+            // หยุด game loop เมื่อ game over
+            if (gameLoop != null) {
+                gameLoop.stop();
+            }
+
+            // แสดงหน้า game over
             gameStage.showGameOver(score);
+
+            // ทำความสะอาด objects ที่เหลือ
+            clearGameObjects();
+
             logger.info("Game Over! Final score: {}", score);
         }
     }
-
-
-
-    private void handleAsteroidHit(Asteroid asteroid, Bullet bullet) {
-        // คำนวณคะแนนตามขนาดของ asteroid
-        int points = (asteroid.getSize() == 1) ? SMALL_ASTEROID_POINTS : LARGE_ASTEROID_POINTS;
-        score += points;
-        gameStage.updateScore(score);
-
-        // Remove asteroid and bullet
-        asteroids.remove(asteroid);
-        bullets.remove(bullet);
-        gameStage.removeGameObject(asteroid);
-        gameStage.removeBullet(bullet);
-
-        // Show explosion and spawn smaller asteroids if applicable
-        gameStage.showExplosion(asteroid.getPosition());
-        if (asteroid.getSize() == 2) { // Large asteroid
-            List<Asteroid> fragments = asteroid.split();
-            for (Asteroid fragment : fragments) {
-                asteroids.add(fragment);
-                gameStage.addGameObject(fragment);
-            }
+    private void clearGameObjects() {
+        // ลบ objects ทั้งหมดออกจากเกม
+        for (Asteroid asteroid : asteroids) {
+            gameStage.removeGameObject(asteroid);
+            asteroid.dispose(); // ถ้ามีเมธอด dispose
         }
+        asteroids.clear();
 
-        logger.info("Asteroid size {} destroyed! Points awarded: {}, Total score: {}",
-                asteroid.getSize(), points, score);
+        for (Bullet bullet : bullets) {
+            gameStage.removeBullet(bullet);
+        }
+        bullets.clear();
+
+        if (boss != null) {
+            gameStage.removeGameObject(boss);
+            boss = null;
+        }
     }
 
     private void spawnBoss() {
@@ -355,15 +413,12 @@ public class GameController {
     private void spawnAsteroids(int count) {
         for (int i = 0; i < count; i++) {
             Point2D position = getRandomSpawnPosition();
-            // Randomly decide size (1 or 2)
-            int size = random.nextDouble() < 0.7 ? 1 : 2; // 70% small, 30% large
-            Asteroid asteroid = new Asteroid(position, size);
+            Asteroid asteroid = new Asteroid(position);  // ไม่ต้องกำหนด size parameter แล้ว
             asteroids.add(asteroid);
             gameStage.addGameObject(asteroid);
         }
+        logger.info("Spawned {} new asteroids", count);
     }
-
-
 
     private void spawnNewAsteroids() {
         if (asteroids.size() < MIN_ASTEROIDS && boss == null && random.nextDouble() < SPAWN_CHANCE) {
