@@ -116,7 +116,7 @@ public class Launcher extends Application {
             }
         });
 
-        // Setup continuous input handling
+        // Setup continuous input handlingsss
         new javafx.animation.AnimationTimer() {
             @Override
             public void handle(long now) {
@@ -128,17 +128,29 @@ public class Launcher extends Application {
     private void handleContinuousInput() {
         if (!gameView.isGameStarted() || gameView.isPaused()) return;
 
-        if (pressedKeys.contains(KeyCode.A)) {
+        if (pressedKeys.contains(KeyCode.Q)) {
             gameView.rotateLeft();
             logger.debug("Rotating left");
         }
-        if (pressedKeys.contains(KeyCode.D)) {
+        if (pressedKeys.contains(KeyCode.E)) {
             gameView.rotateRight();
             logger.debug("Rotating right");
         }
         if (pressedKeys.contains(KeyCode.W)) {
-            gameView.thrust();
-            logger.debug("Thrusting");
+            gameView.moveUp();
+            logger.debug("Moving up");
+        }
+        if (pressedKeys.contains(KeyCode.S)) {
+            gameView.moveDown();
+            logger.debug("Moving down");
+        }
+        if (pressedKeys.contains(KeyCode.A)) {
+            gameView.moveLeft();
+            logger.debug("Moving left");
+        }
+        if (pressedKeys.contains(KeyCode.D)) {
+            gameView.moveRight();
+            logger.debug("Moving right");
         }
     }
 
