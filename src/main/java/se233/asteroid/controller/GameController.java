@@ -411,18 +411,54 @@ public class GameController {
     }
 
     private void spawnAsteroids(int count) {
-        for (int i = 0; i < count; i++) {
-            Point2D position = getRandomSpawnPosition();
-            Asteroid asteroid = new Asteroid(position);  // ไม่ต้องกำหนด size parameter แล้ว
-            asteroids.add(asteroid);
-            gameStage.addGameObject(asteroid);
+        if (currentWave == 1) {
+            // Wave 1: 2 ASTEROID และ 2 METEOR แน่นอน
+            for (int i = 0; i < 2; i++) {
+                // สร้าง ASTEROID
+                Point2D asteroidPos = getRandomSpawnPosition();
+                Asteroid asteroid = new Asteroid(asteroidPos, Asteroid.Type.ASTEROID);
+                asteroids.add(asteroid);
+                gameStage.addGameObject(asteroid);
+
+                // สร้าง METEOR
+                Point2D meteorPos = getRandomSpawnPosition();
+                Asteroid meteor = new Asteroid(meteorPos, Asteroid.Type.METEOR);
+                asteroids.add(meteor);
+                gameStage.addGameObject(meteor);
+            }
+            logger.info("Wave 1: Spawned 2 asteroids and 2 meteors");
+        } else {
+            // Wave 2-5: สุ่มเกิด 5 อุกาบาตจาก ASTEROID และ METEOR
+            for (int i = 0; i < 5; i++) {
+                Point2D position = getRandomSpawnPosition();
+
+                // สุ่มว่าจะเป็น ASTEROID หรือ METEOR (50-50)
+                if (random.nextDouble() < 0.5) {
+                    Asteroid asteroid = new Asteroid(position, Asteroid.Type.ASTEROID);
+                    asteroids.add(asteroid);
+                    gameStage.addGameObject(asteroid);
+                } else {
+                    Asteroid meteor = new Asteroid(position, Asteroid.Type.METEOR);
+                    asteroids.add(meteor);
+                    gameStage.addGameObject(meteor);
+                }
+            }
+            logger.info("Wave {}: Spawned 5 random objects", currentWave);
         }
-        logger.info("Spawned {} new asteroids", count);
     }
 
     private void spawnNewAsteroids() {
         if (asteroids.size() < MIN_ASTEROIDS && boss == null && random.nextDouble() < SPAWN_CHANCE) {
-            spawnAsteroids(1);
+            Point2D position = getRandomSpawnPosition();
+            if (random.nextDouble() < 0.3) { // 30% chance for meteor
+                Asteroid meteor = new Asteroid(position, Asteroid.Type.METEOR);
+                asteroids.add(meteor);
+                gameStage.addGameObject(meteor);
+                logger.info("Spawned new meteor");
+            } else {
+                spawnAsteroids(1);
+                }
+
         }
     }
 
