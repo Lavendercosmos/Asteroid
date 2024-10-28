@@ -16,26 +16,30 @@ public class Enemy extends Character {
     private static final Logger logger = LogManager.getLogger(Enemy.class);
 
     // Movement constants
-    private static final double DEFAULT_SPEED = 2.0;
-    private static final double SECOND_TIER_SPEED = 3.0;
+    // Update movement constants for regular enemy
+    private static final double DEFAULT_SPEED = 1.0;
+    private static final double SECOND_TIER_SPEED = 2.0;
     private static final double DEFAULT_HITBOX = 15.0;
     private static final double SECOND_TIER_HITBOX = 20.0;
-    private static final double BULLET_SPEED = 5.0;
+    private static final double BULLET_SPEED = 6.0; // Adjusted for better gameplay
     private static final double SHOOTING_RANGE = 300.0;
     private static final double SHOOTING_COOLDOWN = 2.0; // seconds
     private static final double BEHAVIOR_CHANGE_CHANCE = 0.02;
     private static final double MIN_DISTANCE_TO_PLAYER = 100.0;
 
     // Sprite paths
-    private static final String REGULAR_ENEMY_SPRITE = "/se233/asteroid/assets/Enemy/enemy_regular.png";
-    private static final String SECOND_TIER_ENEMY_SPRITE = "/se233/asteroid/assets/Enemy/enemy_tier2.png";
-    private static final String REGULAR_SHOOT_SPRITE = "/se233/asteroid/assets/Enemy/enemy_regular_shoot.png";
-    private static final String SECOND_TIER_SHOOT_SPRITE = "/se233/asteroid/assets/Enemy/enemy_tier2_shoot.png";
-    private static final String EXPLOSION_SPRITE = "/se233/asteroid/assets/Enemy/Enemy_Explosion.png";
+    private static final String REGULAR_ENEMY_SPRITE = "/se233/asteroid/assets/Enemy/Enemy_ship.png";
+    private static final String SECOND_TIER_ENEMY_SPRITE = "/se233/asteroid/assets/Enemy/Second-tier enemy.png";
+    private static final String REGULAR_SHOOT_SPRITE = "/se233/asteroid/assets/Enemy/Enemy_shoot.png";
+    private static final String SECOND_TIER_SHOOT_SPRITE = "/se233/asteroid/assets/Enemy/Second_shot.png";
+    private static final String REGULAR_EXPLOSION_SPRITE = "/se233/asteroid/assets/Enemy/Enemy_Explosion.png";
+    private static final String SECOND_TIER_EXPLOSION_SPRITE = "/se233/asteroid/assets/Enemy/Explosion_second.png";
 
     // Animation constants
-    private static final int EXPLOSION_FRAME_COUNT = 9;
-    private static final double EXPLOSION_FRAME_DURATION = 0.1; // seconds per frame
+    private static final double SHOOTING_DURATION = 0.15; // 150ms for shooting animation
+    private static final double EXPLOSION_FRAME_DURATION = 0.06; // Faster explosion (60ms per frame)
+    private static final int EXPLOSION_FRAME_COUNT = 9; // Match the sprite sheet frame count
+
 
     // Enemy properties
     private final boolean isSecondTier;
@@ -45,13 +49,17 @@ public class Enemy extends Character {
     private final Random random;
     private Point2D targetPosition;
     private Map<String, Image> sprites;
-    private boolean isShooting;
+    private boolean isShootingAnimation = false;
+    private double shootingAnimationTimer = 0;
 
-    // Explosion animation properties
+    // Enhanced explosion properties
     private Image[] explosionFrames;
     private int currentExplosionFrame;
     private double explosionTimer;
     private boolean isExploding;
+    private double explosionRotation;
+    private double explosionScale;
+    private Point2D explosionOffset;
 
     // Behavior patterns
     private enum EnemyBehavior {
@@ -85,48 +93,57 @@ public class Enemy extends Character {
     private void initializeSprites() {
         sprites = new HashMap<>();
         try {
-            // Load normal sprites
-            sprites.put("normal", new Image(getClass().getResourceAsStream(
+            // Load normal state sprite
+            Image normalSprite = new Image(getClass().getResourceAsStream(
                     isSecondTier ? SECOND_TIER_ENEMY_SPRITE : REGULAR_ENEMY_SPRITE
-            )));
+            ));
+            sprites.put("normal", normalSprite);
 
-            // Load shooting sprites
-            sprites.put("shooting", new Image(getClass().getResourceAsStream(
+            // Load shooting state sprite
+            Image shootingSprite = new Image(getClass().getResourceAsStream(
                     isSecondTier ? SECOND_TIER_SHOOT_SPRITE : REGULAR_SHOOT_SPRITE
-            )));
+            ));
+            sprites.put("shooting", shootingSprite);
 
+            // Set initial sprite
             sprite.setImage(sprites.get("normal"));
+
+            // Center the sprite
+            sprite.setTranslateX(-normalSprite.getWidth() / 2);
+            sprite.setTranslateY(-normalSprite.getHeight() / 2);
+
         } catch (Exception e) {
-            logger.error("Failed to load enemy sprites", e);
+            logger.error("Failed to load enemy sprites: {}", e.getMessage());
         }
     }
 
     private void initializeExplosionFrames() {
         explosionFrames = new Image[EXPLOSION_FRAME_COUNT];
         try {
-            // Load the sprite sheet
-            Image explosionSheet = new Image(getClass().getResourceAsStream(EXPLOSION_SPRITE));
+            // Load explosion sprite sheet
+            String explosionPath = isSecondTier ? SECOND_TIER_EXPLOSION_SPRITE : REGULAR_EXPLOSION_SPRITE;
+            Image explosionSheet = new Image(getClass().getResourceAsStream(explosionPath));
+
             double frameWidth = explosionSheet.getWidth() / EXPLOSION_FRAME_COUNT;
             double frameHeight = explosionSheet.getHeight();
 
-            // Create a WritableImage for each frame
+            // Extract each frame with proper transparency
             for (int i = 0; i < EXPLOSION_FRAME_COUNT; i++) {
-                // Calculate the source rectangle for this frame
-                double sourceX = i * frameWidth;
-
-                // Create snapshot parameters to extract each frame
                 SnapshotParameters params = new SnapshotParameters();
-                params.setViewport(new Rectangle2D(sourceX, 0, frameWidth, frameHeight));
+                params.setFill(javafx.scene.paint.Color.TRANSPARENT);
+                params.setViewport(new Rectangle2D(i * frameWidth, 0, frameWidth, frameHeight));
 
-                // Create an ImageView to help with frame extraction
                 ImageView frameView = new ImageView(explosionSheet);
-                frameView.setViewport(new Rectangle2D(sourceX, 0, frameWidth, frameHeight));
+                frameView.setViewport(new Rectangle2D(i * frameWidth, 0, frameWidth, frameHeight));
 
-                // Take snapshot of the frame
+                // Center the frame
+                frameView.setTranslateX(-frameWidth / 2);
+                frameView.setTranslateY(-frameHeight / 2);
+
                 explosionFrames[i] = frameView.snapshot(params, null);
             }
         } catch (Exception e) {
-            logger.error("Failed to load explosion sprites", e);
+            logger.error("Failed to load explosion sprites: {}", e.getMessage());
         }
     }
 
@@ -146,33 +163,33 @@ public class Enemy extends Character {
 
         if (!isAlive) return;
 
-        // Update shooting cooldown
+        // Update shooting cooldown and animation
         if (shootingCooldown > 0) {
-            shootingCooldown -= 0.016; // Assuming 60 FPS
+            shootingCooldown -= 0.016;
         }
 
-        // Chance to change behavior
-        if (random.nextDouble() < BEHAVIOR_CHANGE_CHANCE) {
-            switchBehavior();
-        }
-
-        // Handle shooting animation
-        if (isShooting) {
-            sprite.setImage(sprites.get("shooting"));
-            isShooting = false; // Reset after one frame
-        } else {
-            sprite.setImage(sprites.get("normal"));
+        // Handle shooting animation timing
+        if (isShootingAnimation) {
+            shootingAnimationTimer += 0.016;
+            if (shootingAnimationTimer >= SHOOTING_DURATION) {
+                isShootingAnimation = false;
+                shootingAnimationTimer = 0;
+                sprite.setImage(sprites.get("normal"));
+            }
         }
 
         // Update movement based on current behavior
         updateMovement();
 
-        // Call parent update for standard functionality
+        // Call parent update
         super.update();
     }
 
+
     private void updateExplosion() {
-        explosionTimer += 0.016; // Assuming 60 FPS
+        if (!isExploding) return;
+
+        explosionTimer += 0.016;
         if (explosionTimer >= EXPLOSION_FRAME_DURATION) {
             explosionTimer = 0;
             currentExplosionFrame++;
@@ -180,11 +197,18 @@ public class Enemy extends Character {
             if (currentExplosionFrame < EXPLOSION_FRAME_COUNT) {
                 sprite.setImage(explosionFrames[currentExplosionFrame]);
             } else {
-                isExploding = false;
-                isAlive = false;
-                logger.debug("Explosion animation completed at position: {}", position);
+                completeExplosion();
             }
         }
+    }
+
+    private void completeExplosion() {
+        isExploding = false;
+        isAlive = false;
+        sprite.setScaleX(1.0);
+        sprite.setScaleY(1.0);
+        sprite.setRotate(0);
+        logger.info("Enemy explosion completed at position: {}", position);
     }
 
     public void updateAI(Point2D playerPosition) {
@@ -213,9 +237,12 @@ public class Enemy extends Character {
             isExploding = true;
             currentExplosionFrame = 0;
             explosionTimer = 0;
-            velocity = new Point2D(0, 0); // Stop movement during explosion
+            explosionRotation = Math.random() * 360; // Random initial rotation
+            explosionScale = 1.0;
+            explosionOffset = new Point2D(0, 0);
+            velocity = new Point2D(0, 0); // Stop movement
             sprite.setImage(explosionFrames[0]);
-            logger.info("Enemy hit and starting explosion animation at position: {}", position);
+            logger.info("Enemy hit and starting enhanced explosion animation at position: {}", position);
         }
     }
 
@@ -271,14 +298,19 @@ public class Enemy extends Character {
     }
 
     public Bullet shoot(Point2D target) {
-        if (isExploding) return null;
+        if (isExploding || !isAlive) return null;
 
-        isShooting = true;
+        // Start shooting animation
+        isShootingAnimation = true;
+        shootingAnimationTimer = 0;
+        sprite.setImage(sprites.get("shooting"));
+
+        // Calculate shooting direction
         Point2D direction = target.subtract(position).normalize();
 
-        // Add slight inaccuracy for regular enemies
+        // Add inaccuracy for regular enemies
         if (!isSecondTier) {
-            double inaccuracy = (random.nextDouble() - 0.5) * 0.2; // ±0.1 radians
+            double inaccuracy = (random.nextDouble() - 0.5) * 0.2;
             double cos = Math.cos(inaccuracy);
             double sin = Math.sin(inaccuracy);
             direction = new Point2D(
@@ -287,10 +319,8 @@ public class Enemy extends Character {
             );
         }
 
-        // Create bullet with appropriate speed
-        Bullet bullet = new Bullet(position, direction.multiply(BULLET_SPEED));
-        logger.debug("Enemy fired bullet at target: {}", target);
-        return bullet;
+        // Create and return bullet
+        return new Bullet(position, direction.multiply(BULLET_SPEED));
     }
 
     // Additional getters for explosion state
