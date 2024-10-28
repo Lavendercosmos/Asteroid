@@ -21,7 +21,7 @@ public class GameView extends Pane {
     private static final long BULLET_COOLDOWN = 250_000_000L; // 250ms
     private static final int INITIAL_ENEMIES = 2;
     private static final double ENEMY_SPAWN_CHANCE = 0.01; // 1% chance per frame
-    private static final int MAX_ENEMIES = 5;
+    private static final int MAX_ENEMIES = 3;
     private static final int POINTS_REGULAR_ENEMY = 100;
     private static final int POINTS_SECOND_TIER_ENEMY = 250;
 
