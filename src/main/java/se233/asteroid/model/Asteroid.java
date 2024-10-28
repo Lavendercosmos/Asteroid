@@ -58,7 +58,6 @@ public class Asteroid extends Character {
                 type == Type.ASTEROID ? ASTEROID_RADIUS : METEOR_RADIUS);
 
         this.type = type;
-        this.size = size; // 1 for small, 2 for large
         this.isInvulnerable = false;
         this.points = 100; // Fixed points for destroying asteroid
         this.isExploding = false;
@@ -187,6 +186,7 @@ public class Asteroid extends Character {
 
             // สร้าง fragment ในตำแหน่งใหม่
             Asteroid fragment = new Asteroid(newPos, Type.ASTEROID);
+            fragment.setInvulnerable(true);
             fragments.add(fragment);
         }
 
