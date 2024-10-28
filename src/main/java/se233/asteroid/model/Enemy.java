@@ -1,7 +1,10 @@
 package se233.asteroid.model;
 
 import javafx.geometry.Point2D;
+import javafx.geometry.Rectangle2D;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -28,6 +31,11 @@ public class Enemy extends Character {
     private static final String SECOND_TIER_ENEMY_SPRITE = "/se233/asteroid/assets/Enemy/enemy_tier2.png";
     private static final String REGULAR_SHOOT_SPRITE = "/se233/asteroid/assets/Enemy/enemy_regular_shoot.png";
     private static final String SECOND_TIER_SHOOT_SPRITE = "/se233/asteroid/assets/Enemy/enemy_tier2_shoot.png";
+    private static final String EXPLOSION_SPRITE = "/se233/asteroid/assets/Enemy/Enemy_Explosion.png";
+
+    // Animation constants
+    private static final int EXPLOSION_FRAME_COUNT = 9;
+    private static final double EXPLOSION_FRAME_DURATION = 0.1; // seconds per frame
 
     // Enemy properties
     private final boolean isSecondTier;
@@ -38,6 +46,12 @@ public class Enemy extends Character {
     private Point2D targetPosition;
     private Map<String, Image> sprites;
     private boolean isShooting;
+
+    // Explosion animation properties
+    private Image[] explosionFrames;
+    private int currentExplosionFrame;
+    private double explosionTimer;
+    private boolean isExploding;
 
     // Behavior patterns
     private enum EnemyBehavior {
@@ -58,8 +72,12 @@ public class Enemy extends Character {
         this.random = new Random();
         this.shootingCooldown = SHOOTING_COOLDOWN;
         this.currentBehavior = EnemyBehavior.PATROL;
+        this.isExploding = false;
+        this.currentExplosionFrame = 0;
+        this.explosionTimer = 0;
 
         initializeSprites();
+        initializeExplosionFrames();
         initializeVelocity();
         logger.info("Enemy created: Second Tier = {}, Position = {}", isSecondTier, position);
     }
@@ -83,6 +101,35 @@ public class Enemy extends Character {
         }
     }
 
+    private void initializeExplosionFrames() {
+        explosionFrames = new Image[EXPLOSION_FRAME_COUNT];
+        try {
+            // Load the sprite sheet
+            Image explosionSheet = new Image(getClass().getResourceAsStream(EXPLOSION_SPRITE));
+            double frameWidth = explosionSheet.getWidth() / EXPLOSION_FRAME_COUNT;
+            double frameHeight = explosionSheet.getHeight();
+
+            // Create a WritableImage for each frame
+            for (int i = 0; i < EXPLOSION_FRAME_COUNT; i++) {
+                // Calculate the source rectangle for this frame
+                double sourceX = i * frameWidth;
+
+                // Create snapshot parameters to extract each frame
+                SnapshotParameters params = new SnapshotParameters();
+                params.setViewport(new Rectangle2D(sourceX, 0, frameWidth, frameHeight));
+
+                // Create an ImageView to help with frame extraction
+                ImageView frameView = new ImageView(explosionSheet);
+                frameView.setViewport(new Rectangle2D(sourceX, 0, frameWidth, frameHeight));
+
+                // Take snapshot of the frame
+                explosionFrames[i] = frameView.snapshot(params, null);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to load explosion sprites", e);
+        }
+    }
+
     private void initializeVelocity() {
         double angle = random.nextDouble() * 2 * Math.PI;
         double vx = Math.cos(angle) * speed;
@@ -92,6 +139,11 @@ public class Enemy extends Character {
 
     @Override
     public void update() {
+        if (isExploding) {
+            updateExplosion();
+            return;
+        }
+
         if (!isAlive) return;
 
         // Update shooting cooldown
@@ -119,7 +171,25 @@ public class Enemy extends Character {
         super.update();
     }
 
+    private void updateExplosion() {
+        explosionTimer += 0.016; // Assuming 60 FPS
+        if (explosionTimer >= EXPLOSION_FRAME_DURATION) {
+            explosionTimer = 0;
+            currentExplosionFrame++;
+
+            if (currentExplosionFrame < EXPLOSION_FRAME_COUNT) {
+                sprite.setImage(explosionFrames[currentExplosionFrame]);
+            } else {
+                isExploding = false;
+                isAlive = false;
+                logger.debug("Explosion animation completed at position: {}", position);
+            }
+        }
+    }
+
     public void updateAI(Point2D playerPosition) {
+        if (isExploding) return;
+
         // Store player position for behavior updates
         this.targetPosition = playerPosition;
 
@@ -138,6 +208,18 @@ public class Enemy extends Character {
         }
     }
 
+    public void hit() {
+        if (!isExploding) {
+            isExploding = true;
+            currentExplosionFrame = 0;
+            explosionTimer = 0;
+            velocity = new Point2D(0, 0); // Stop movement during explosion
+            sprite.setImage(explosionFrames[0]);
+            logger.info("Enemy hit and starting explosion animation at position: {}", position);
+        }
+    }
+
+    // Existing methods remain unchanged
     private void updateMovement() {
         if (targetPosition == null) return;
 
@@ -155,7 +237,6 @@ public class Enemy extends Character {
 
             case STRAFE:
                 direction = targetPosition.subtract(position);
-                // Calculate perpendicular vector for strafing
                 velocity = new Point2D(-direction.getY(), direction.getX())
                         .normalize()
                         .multiply(speed);
@@ -163,7 +244,6 @@ public class Enemy extends Character {
 
             case PATROL:
             default:
-                // Keep current velocity, just add small random adjustments
                 if (random.nextDouble() < 0.05) {
                     double angle = random.nextDouble() * 2 * Math.PI;
                     velocity = velocity.add(new Point2D(
@@ -174,7 +254,6 @@ public class Enemy extends Character {
                 break;
         }
 
-        // Rotate sprite to face movement direction
         if (velocity.magnitude() > 0) {
             rotation = Math.toDegrees(Math.atan2(velocity.getY(), velocity.getX()));
         }
@@ -192,6 +271,8 @@ public class Enemy extends Character {
     }
 
     public Bullet shoot(Point2D target) {
+        if (isExploding) return null;
+
         isShooting = true;
         Point2D direction = target.subtract(position).normalize();
 
@@ -212,12 +293,16 @@ public class Enemy extends Character {
         return bullet;
     }
 
-    public void hit() {
-        isAlive = false;
-        logger.info("Enemy destroyed at position: {}", position);
+    // Additional getters for explosion state
+    public boolean isExploding() {
+        return isExploding;
     }
 
-    // Getters and utility methods
+    public int getCurrentExplosionFrame() {
+        return currentExplosionFrame;
+    }
+
+    // Existing getters remain unchanged
     public boolean isSecondTier() {
         return isSecondTier;
     }
