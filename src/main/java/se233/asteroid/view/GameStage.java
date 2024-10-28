@@ -1,6 +1,7 @@
 package se233.asteroid.view;
 
 import javafx.animation.*;
+import javafx.application.Platform;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
@@ -49,7 +50,7 @@ public class GameStage extends Pane {
     private Pane particleLayer;
 
     // UI Elements
-    private Text scoreText;
+    public Text scoreText;
     private Text livesText;
     private Text waveText;
     private Group gameOverGroup;
@@ -212,11 +213,22 @@ public class GameStage extends Pane {
     }
 
     private void setupHUD() {
-        scoreText = createStyledText("Score: 0", 20, 30);
+        // สร้าง score text ด้วยสไตล์ที่ชัดเจน
+        scoreText = new Text(20, 30, "Score: "+ currentScore);
+        scoreText.setFont(Font.font("Arial", FontWeight.BOLD, 24));
+        scoreText.setFill(Color.YELLOW); // เปลี่ยนสีให้เด่นชัด
+        scoreText.setEffect(new DropShadow(3, Color.BLACK)); // เพิ่ม effect ให้อ่านง่าย
+
+        // จัดการ UI อื่นๆ
         livesText = createStyledText("Lives: " + currentLives, 20, 60);
         waveText = createStyledText("Wave: " + currentWave, WINDOW_WIDTH - 150, 30);
+
         uiLayer.getChildren().addAll(scoreText, livesText, waveText);
+
+        // นำ score text ไว้ด้านหน้าสุด
+        scoreText.toFront();
     }
+
 
     private Text createStyledText(String content, double x, double y) {
         Text text = new Text(x, y, content);
@@ -260,7 +272,8 @@ public class GameStage extends Pane {
 
         Text controlsText = new Text(
                 "Controls:\n" +
-                        "WASD - Move\n" +
+                        "W,A,S,D - Move\n" +
+                        "Q,E - Rotage\n" +
                         "Space - Shoot\n" +
                         "ESC - Pause"
         );
@@ -576,35 +589,62 @@ public class GameStage extends Pane {
         animation.play();
     }
 
-    // Game state updates
+    // แก้ไขเมธอด updateScore
     public void updateScore(int score) {
         this.currentScore = score;
-        scoreText.setText("Score: " + score);
-        showScorePopup(score);
+        if (scoreText != null) {
+            Platform.runLater(() -> {
+                scoreText.setText("Score: " + score);
+
+                // เพิ่ม effect เมื่อคะแนนเปลี่ยน
+                ScaleTransition st = new ScaleTransition(Duration.millis(100), scoreText);
+                st.setFromX(1.2);
+                st.setFromY(1.2);
+                st.setToX(1.0);
+                st.setToY(1.0);
+                st.play();
+            });
+        }
+        logger.debug("Score updated to: {}", score);
     }
 
-    private void showScorePopup(int score) {
-        Text popup = new Text("+" + score);
-        popup.setFont(Font.font("Arial", FontWeight.BOLD, 24 * scale.getX()));
-        popup.setFill(Color.YELLOW);
+    // เพิ่มเมธอดสำหรับรีเซ็ตคะแนน
+    private void resetScore() {
+        currentScore = 0;
+        if (scoreText != null) {
+            scoreText.setText("Score:0");
+        }
+    }
 
-        Point2D popupPos = gameToScreen(new Point2D(
-                scoreText.getLayoutX() + 100,
-                scoreText.getLayoutY()
-        ));
-        popup.setX(popupPos.getX());
-        popup.setY(popupPos.getY());
+    public void showScorePopup(int points, Point2D position) {
+        Text scorePopup = new Text("+" + points);
+        scorePopup.setFont(Font.font("Arial", FontWeight.BOLD, 24 * scale.getX()));
+        scorePopup.setFill(Color.YELLOW);
 
-        effectLayer.getChildren().add(popup);
+        // Convert game position to screen position
+        Point2D screenPos = gameToScreen(position);
+        scorePopup.setX(screenPos.getX());
+        scorePopup.setY(screenPos.getY());
+
+        // Add to effect layer
+        effectLayer.getChildren().add(scorePopup);
 
         double animationSpeed = 0.5 / Math.max(scale.getX(), scale.getY());
         ParallelTransition animation = new ParallelTransition(
-                createFadeTransition(popup, 1.0, 0.0, animationSpeed),
-                createScaleTransition(popup, 1.0, 1.5, animationSpeed)
+                // Fade out
+                createFadeTransition(scorePopup, 1.0, 0.0, animationSpeed),
+                // Float up
+                createMoveTransition(scorePopup,
+                        scorePopup.getX(),
+                        scorePopup.getY() - 50,
+                        animationSpeed)
         );
-        animation.setOnFinished(e -> effectLayer.getChildren().remove(popup));
+
+        animation.setOnFinished(e -> effectLayer.getChildren().remove(scorePopup));
         animation.play();
     }
+
+
 
     public void updateLives(int lives) {
         this.currentLives = lives;
@@ -721,11 +761,11 @@ public class GameStage extends Pane {
         animation.play();
     }
 
-    private TranslateTransition createMoveTransition(Node node, double targetX, double targetY, double duration) {
+    // Helper method สำหรับสร้าง animation การเคลื่อนที่
+    private TranslateTransition createMoveTransition(Node node, double toX, double toY, double duration) {
         TranslateTransition move = new TranslateTransition(Duration.seconds(duration), node);
-        move.setToX(targetX);
-        move.setToY(targetY);
-        move.setInterpolator(Interpolator.EASE_OUT);
+        move.setToX(toX);
+        move.setToY(toY);
         return move;
     }
 
@@ -750,7 +790,10 @@ public class GameStage extends Pane {
 
         effectLayer.getChildren().add(announcement);
 
+        // Calculate animation speed based on scale
         double animationSpeed = 0.5 / Math.max(scale.getX(), scale.getY());
+
+        // Create and play animation
         ParallelTransition animation = new ParallelTransition(
                 createFadeTransition(announcement, 1.0, 0.0, animationSpeed),
                 createScaleTransition(announcement, 0.5, 1.5, animationSpeed)
@@ -844,8 +887,8 @@ public class GameStage extends Pane {
         isGameStarted = false;
         isPaused = false;
         currentWave = 1;
-        currentScore = 0;
         currentLives = 3;
+        resetScore();
 
         // Reset UI elements
         scoreText.setText("Score: 0");

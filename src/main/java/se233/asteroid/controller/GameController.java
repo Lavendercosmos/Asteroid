@@ -259,7 +259,7 @@ public class GameController {
                 // ตรวจสอบว่าสามารถชนได้หรือไม่
                 if (!asteroid.isExploding() && !asteroid.isInvulnerable() && bullet.collidesWith(asteroid)) {
                     // แสดง explosion effect
-                    //gameStage.showExplosion(asteroid.getPosition());
+                    gameStage.showExplosion(asteroid.getPosition());
 
                     // ทำลายกระสุน
                     bulletIter.remove();
@@ -335,7 +335,7 @@ public class GameController {
     private void handlePlayerHit() {
         player.hit();
         gameStage.updateLives(player.getLives());
-        //gameStage.showExplosion(player.getPosition());
+        gameStage.showExplosion(player.getPosition());
 
         if (!player.isAlive()) {
             gameOver = true;
@@ -384,7 +384,7 @@ public class GameController {
         boss.hit(10);
         bullets.remove(bullet);
         gameStage.removeBullet(bullet);
-       // gameStage.showExplosion(bullet.getPosition());
+        gameStage.showExplosion(bullet.getPosition());
 
         if (!boss.isAlive()) {
             // Boss ให้คะแนนมากกว่าศัตรูธรรมดา

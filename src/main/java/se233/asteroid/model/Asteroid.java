@@ -30,6 +30,7 @@ public class Asteroid extends Character {
 
     // Asteroid properties
     private final int points;
+    private int size;
     private boolean isExploding;
     private List<Image> explosionFrames;
     private int currentExplosionFrame;
@@ -44,6 +45,7 @@ public class Asteroid extends Character {
 
     public Asteroid(Point2D position) {
         super(ASTEROID_BASE_PATH, position, ASTEROID_RADIUS);
+        this.size = size; // 1 for small, 2 for large
         this.isInvulnerable = false;
         this.points = 100; // Fixed points for destroying asteroid
         this.isExploding = false;
@@ -256,6 +258,7 @@ public class Asteroid extends Character {
     public int getPoints() { return points; }
     public boolean isExploding() { return isExploding; }
     public double getRadius() { return ASTEROID_RADIUS; }
+    public int getSize() {return size;}
 
     // Resource cleanup
     public void dispose() {

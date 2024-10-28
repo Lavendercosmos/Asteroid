@@ -17,7 +17,7 @@ public class GameState {
     private final BooleanProperty gamePaused = new SimpleBooleanProperty(false);
     private final BooleanProperty gameOver = new SimpleBooleanProperty(false);
     private final IntegerProperty currentWave = new SimpleIntegerProperty(1);
-    private final IntegerProperty score = new SimpleIntegerProperty(0);
+    private final IntegerProperty currentScore = new SimpleIntegerProperty(0);
     private final IntegerProperty lives = new SimpleIntegerProperty(3);
     private final IntegerProperty highScore = new SimpleIntegerProperty(0);
 
@@ -44,6 +44,8 @@ public class GameState {
     private long waveStartTime;
     private boolean waveInProgress;
 
+
+
     public GameState() {
         setupInitialState();
         setupScoreListener();
@@ -51,7 +53,7 @@ public class GameState {
 
     private void setupInitialState() {
         lives.set(STARTING_LIVES);
-        score.set(0);
+        currentScore.set(0);
         currentWave.set(1);
         waveStartTime = System.currentTimeMillis();
         waveInProgress = false;
@@ -59,7 +61,7 @@ public class GameState {
     }
 
     private void setupScoreListener() {
-        score.addListener((observable, oldValue, newValue) -> {
+        currentScore.addListener((observable, oldValue, newValue) -> {
             // Check for extra life
             if (newValue.intValue() / EXTRA_LIFE_SCORE > lastExtraLifeScore / EXTRA_LIFE_SCORE) {
                 awardExtraLife();
@@ -93,7 +95,7 @@ public class GameState {
     public void endGame() {
         gameStarted.set(false);
         gameOver.set(true);
-        logger.info("Game over with final score: {}", score.get());
+        logger.info("Game over with final score: {}", currentScore.get());
     }
 
     // Wave management methods
@@ -151,8 +153,8 @@ public class GameState {
 
     // Scoring methods
     public void addScore(int points) {
-        score.set(score.get() + points);
-        logger.debug("Score increased by {} to {}", points, score.get());
+        currentScore.set(currentScore.get() + points);
+        logger.debug("Score increased by {} to {}", points, currentScore.get());
     }
 
     public void awardWaveBonus() {
@@ -163,7 +165,7 @@ public class GameState {
 
     private void awardExtraLife() {
         lives.set(lives.get() + 1);
-        logger.info("Extra life awarded at score {}", score.get());
+        logger.info("Extra life awarded at score {}", currentScore.get());
     }
 
     // Player management methods
@@ -213,7 +215,7 @@ public class GameState {
     public BooleanProperty gamePausedProperty() { return gamePaused; }
     public BooleanProperty gameOverProperty() { return gameOver; }
     public IntegerProperty currentWaveProperty() { return currentWave; }
-    public IntegerProperty scoreProperty() { return score; }
+    public IntegerProperty scoreProperty() { return currentScore; }
     public IntegerProperty livesProperty() { return lives; }
     public IntegerProperty highScoreProperty() { return highScore; }
 
@@ -222,7 +224,7 @@ public class GameState {
     public boolean isGamePaused() { return gamePaused.get(); }
     public boolean isGameOver() { return gameOver.get(); }
     public int getCurrentWave() { return currentWave.get(); }
-    public int getScore() { return score.get(); }
+    public int getScore() { return currentScore.get(); }
     public int getLives() { return lives.get(); }
     public int getHighScore() { return highScore.get(); }
     public List<Asteroid> getAsteroids() { return new ArrayList<>(asteroids); }

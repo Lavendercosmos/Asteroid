@@ -15,9 +15,9 @@ public class PlayerShip extends Character {
     private static final Logger logger = LogManager.getLogger(PlayerShip.class);
 
     // Movement constants
-    private static final double ACCELERATION = 0.5; //ความเร่ง
+    private static final double ACCELERATION = 0.5;
     private static final double ROTATION_SPEED = 2.0;
-    private static final double FRICTION = 0.98; //ความหน่วง
+    private static final double FRICTION = 0.98;
     private static final double MAX_SPEED = 1.0;
 
     // Ship states
@@ -48,7 +48,7 @@ public class PlayerShip extends Character {
     public PlayerShip(Point2D startPosition) {
         super(SHIP_SPRITE_PATH, startPosition, 5);
         initializeShip();
-        initializeSprites();  // Move this before setupAnimations
+        initializeSprites();
         setupAnimations();
     }
 
@@ -225,22 +225,22 @@ public class PlayerShip extends Character {
         }
     }
 
-//    public void thrust() {
-//        if (!isExploding && isAlive) {
-//            isThrusting = true;
-//            thrusterSprite.setVisible(true);
-//
-//            double radians = Math.toRadians(rotation - 90);
-//            Point2D thrustVector = new Point2D(
-//                    Math.cos(radians) * ACCELERATION,
-//                    Math.sin(radians) * ACCELERATION
-//            );
-//            velocity = velocity.add(thrustVector);
-//
-//            thrusterAnimation.play();
-//            logger.debug("Thrusting in direction: {} degrees", rotation);
-//        }
-//    }
+    public void thrust() {
+        if (!isExploding && isAlive) {
+            isThrusting = true;
+            thrusterSprite.setVisible(true);
+
+            double radians = Math.toRadians(rotation - 90);
+            Point2D thrustVector = new Point2D(
+                    Math.cos(radians) * ACCELERATION,
+                    Math.sin(radians) * ACCELERATION
+            );
+            velocity = velocity.add(thrustVector);
+
+            thrusterAnimation.play();
+            logger.debug("Thrusting in direction: {} degrees", rotation);
+        }
+    }
 
     public void stopThrust() {
         isThrusting = false;
@@ -262,14 +262,13 @@ public class PlayerShip extends Character {
         }
     }
 
-    public se233.asteroid.model.Bullet shoot() {
+    public Bullet shoot() {
         if (!isExploding && isAlive) {
             double radians = Math.toRadians(rotation - 90);
             Point2D direction = new Point2D(Math.cos(radians), Math.sin(radians));
             Point2D bulletPosition = position.add(direction.multiply(sprite.getBoundsInLocal().getWidth() / 2));
             logger.info("Shooting bullet from position: {}", bulletPosition);
-            // Use the fully qualified class name to avoid confusion
-            return new se233.asteroid.model.Bullet(bulletPosition, direction, false);
+            return new Bullet(bulletPosition, direction, false); // isEnemyBullet = false
         }
         return null;
     }
@@ -375,6 +374,7 @@ public class PlayerShip extends Character {
         logger.info("PlayerShip resources disposed");
     }
 
+    // Getters
     public boolean isExploding() {
         return isExploding;
     }
@@ -387,10 +387,11 @@ public class PlayerShip extends Character {
         return lives;
     }
 
+
+    @Override
     public boolean isAlive() {
         return isAlive;
     }
-
 
     public ImageView getThrusterSprite() {
         return thrusterSprite;
@@ -398,35 +399,6 @@ public class PlayerShip extends Character {
 
     public ImageView getShieldSprite() {
         return shieldSprite;
-    }
-
-    // Additional helper class - Bullet
-    public static class Bullet extends Character {
-        private static final double BULLET_SPEED = 10.0;
-        private static final String BULLET_SPRITE_PATH = "src/main/resources/se233/asteroid/assets/PlayerShip/Fx_01.png";
-        private static final double BULLET_RADIUS = 2.0;
-        private static final double BULLET_LIFETIME = 2.0; // seconds
-        private double lifetime;
-
-        public Bullet(Point2D position, Point2D direction) {
-            super(BULLET_SPRITE_PATH, position, BULLET_RADIUS);
-            this.velocity = direction.multiply(BULLET_SPEED);
-            this.lifetime = BULLET_LIFETIME;
-
-            // Set bullet size
-            sprite.setFitWidth(4);
-            sprite.setFitHeight(4);
-        }
-
-        @Override
-        public void update() {
-            super.update();
-            lifetime -= 1.0 / 60.0; // Assuming 60 FPS
-        }
-
-        public boolean isExpired() {
-            return lifetime <= 0;
-        }
     }
 }
 
