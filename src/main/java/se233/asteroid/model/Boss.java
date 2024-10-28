@@ -75,6 +75,10 @@ public class Boss extends Character {
     private Text healthText;
     private Text enragedText;
 
+    private Point2D playerPosition;
+    private static final double TARGETING_ANGLE = 15.0; // Spread angle for targeting shots
+    private static final int TARGETING_SHOTS = 3; // Number of bullets in spread
+
     // Enum for attack patterns
     private enum AttackPattern {
         CIRCLE,
@@ -282,6 +286,7 @@ public class Boss extends Character {
     }
 
     public void update(double deltaTime, Point2D playerPosition) {
+        this.playerPosition = playerPosition;
         // Calculate delta time
         long currentTime = System.nanoTime();
         deltaTime = (currentTime - lastUpdateTime) / 1_000_000_000.0; // Convert to seconds
@@ -353,22 +358,30 @@ public class Boss extends Character {
     }
 
     private void updateMovement() {
-        switch (currentPattern) {
-            case CIRCLE:
-                updateCirclePattern();
-                break;
-            case CHASE:
-                updateChasePattern();
-                break;
-            case ZIGZAG:
-                updateZigzagPattern();
-                break;
-            case SPIRAL:
-                updateSpiralPattern();
-                break;
-            case RANDOM_TELEPORT:
-                updateTeleportPattern();
-                break;
+        if (isEnraged) {
+            // More aggressive movement when enraged
+            if (playerPosition != null) {
+                updateChasePattern(); // Always chase player when enraged
+            }
+        } else {
+            // Normal movement patterns
+            switch (currentPattern) {
+                case CIRCLE:
+                    updateCirclePattern();
+                    break;
+                case CHASE:
+                    updateChasePattern();
+                    break;
+                case ZIGZAG:
+                    updateZigzagPattern();
+                    break;
+                case SPIRAL:
+                    updateSpiralPattern();
+                    break;
+                case RANDOM_TELEPORT:
+                    updateTeleportPattern();
+                    break;
+            }
         }
     }
 
@@ -384,11 +397,11 @@ public class Boss extends Character {
     }
 
     private void updateChasePattern() {
-        // Chase towards center of screen
-        Point2D center = new Point2D(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-        Point2D direction = center.subtract(getPosition()).normalize();
-        double speed = isEnraged ? BASE_SPEED * 1.5 : BASE_SPEED;
-        setVelocity(direction.multiply(speed));
+        if (playerPosition != null) {
+            Point2D direction = playerPosition.subtract(getPosition()).normalize();
+            double speed = isEnraged ? BASE_SPEED * 1.5 : BASE_SPEED;
+            setPosition(getPosition().add(direction.multiply(speed)));
+        }
     }
 
     private void updateZigzagPattern() {
@@ -437,10 +450,22 @@ public class Boss extends Character {
         });
     }
 
+    // Modify special attack to target player
     public Bullet[] shootSpecialAttack() {
         isShooting = true;
         currentFrame = 0;
-        return isEnraged ? shootEnragedSpecialAttack() : shootNormalSpecialAttack();
+
+        if (isEnraged) {
+            // Combine radial attack with targeted shots when enraged
+            Bullet[] radialBullets = shootEnragedSpecialAttack();
+            fireTargetedSpread();
+            return radialBullets;
+        } else {
+            // Add some targeted shots to normal special attack
+            Bullet[] normalBullets = shootNormalSpecialAttack();
+            fireTargetedSpread();
+            return normalBullets;
+        }
     }
 
     private Bullet[] shootNormalSpecialAttack() {
@@ -468,22 +493,27 @@ public class Boss extends Character {
         return bullets;
     }
 
+    // Modify fireBasedOnPattern method to include player targeting
     private void fireBasedOnPattern() {
         isShooting = true;
         currentFrame = 0;
 
         if (isEnraged) {
             fireRadialBullets();
-            fireTargetedBullets();
+            fireTargetedSpread(); // Add spread shots when enraged
         } else {
             switch (currentPattern) {
                 case CIRCLE:
-                case SPIRAL:
                     fireRadialBullets();
                     break;
                 case CHASE:
+                    fireTargetedSpread(); // Use spread shots for chase pattern
+                    break;
                 case ZIGZAG:
-                    fireTargetedBullets();
+                    fireTargetedSpread(); // Use spread shots for zigzag pattern
+                    break;
+                case SPIRAL:
+                    fireRadialBullets();
                     break;
                 case RANDOM_TELEPORT:
                     fireRandomBullets();
@@ -492,6 +522,31 @@ public class Boss extends Character {
         }
 
         timeSinceLastShot = 0;
+    }
+
+    // Add new method for spread shots targeting player
+    private void fireTargetedSpread() {
+        if (playerPosition == null) return;
+
+        // Calculate base direction to player
+        Point2D direction = playerPosition.subtract(getPosition()).normalize();
+
+        // Calculate spread angles
+        double baseAngle = Math.atan2(direction.getY(), direction.getX());
+        double spreadStep = Math.toRadians(TARGETING_ANGLE) / (TARGETING_SHOTS - 1);
+
+        // Fire spread shots
+        for (int i = 0; i < TARGETING_SHOTS; i++) {
+            double angle = baseAngle - Math.toRadians(TARGETING_ANGLE/2) + (spreadStep * i);
+            Point2D bulletDirection = new Point2D(
+                    Math.cos(angle),
+                    Math.sin(angle)
+            );
+
+            double bulletSpeed = isEnraged ? BULLET_SPEED * 1.5 : BULLET_SPEED;
+            Bullet bullet = new Bullet(getPosition(), bulletDirection.multiply(bulletSpeed), true);
+            activeBullets.add(bullet);
+        }
     }
 
     private void fireRadialBullets() {

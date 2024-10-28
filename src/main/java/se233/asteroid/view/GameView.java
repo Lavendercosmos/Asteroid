@@ -41,6 +41,7 @@ public class GameView extends Pane {
     private int currentWave;
     private int currentScore;
     private long lastBulletTime;
+    private long lastUpdateTime;
     private final Random random;
 
     public GameView() {
@@ -61,6 +62,7 @@ public class GameView extends Pane {
         this.isPaused = false;
         this.currentWave = 1;
         this.currentScore = 0;
+        this.lastUpdateTime = System.nanoTime();
 
         setupButtonHandlers();
         setupGameLoop();
@@ -75,11 +77,16 @@ public class GameView extends Pane {
     }
 
     private void setupGameLoop() {
+        lastUpdateTime = System.nanoTime();  // Initialize lastUpdateTime
         AnimationTimer gameLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
                 if (!isPaused && isGameStarted) {
-                    updateGame();
+                    // Calculate deltaTime in seconds
+                    double deltaTime = (now - lastUpdateTime) / 1_000_000_000.0;
+                    lastUpdateTime = now;
+
+                    updateGame(deltaTime);
                     checkCollisions();
                     checkWaveCompletion();
                     spawnNewEnemies();
@@ -89,11 +96,17 @@ public class GameView extends Pane {
         gameLoop.start();
     }
 
-    private void updateGame() {
+    private void updateGame(double deltaTime) {
         // Update player
         if (player != null && player.isAlive()) {
             player.update();
             wrapAround(player);
+        }
+
+        // Update boss
+        if (boss != null && boss.isAlive()) {
+            boss.update(deltaTime, player.getPosition());
+            wrapAround(boss);
         }
 
         // Update enemies
@@ -133,14 +146,7 @@ public class GameView extends Pane {
                 wrapAround(obj);
             }
         }
-
-        // Update boss
-        if (boss != null && boss.isAlive()) {
-            boss.update();
-            wrapAround(boss);
-        }
     }
-
 
     private void checkCollisions() {
         if (player == null || !player.isAlive() || player.isInvulnerable()) return;
@@ -383,7 +389,7 @@ public class GameView extends Pane {
 
             case 2:
                 // Wave 2: Regular enemies must all be defeated
-                if (allEnemiesDestroyed||allAsteroidsDestroyed) {
+                if (allEnemiesDestroyed || allAsteroidsDestroyed) {
                     logger.info("Wave 2 completed - Moving to Wave 3");
                     startNextWave();
                 }
@@ -391,7 +397,7 @@ public class GameView extends Pane {
 
             case 3:
                 // Wave 3: Second-tier enemies must all be defeated
-                if (allEnemiesDestroyed||allAsteroidsDestroyed) {
+                if (allEnemiesDestroyed || allAsteroidsDestroyed) {
                     logger.info("Wave 3 completed - Moving to Wave 4");
                     startNextWave();
                 }
@@ -399,7 +405,7 @@ public class GameView extends Pane {
 
             case 4:
                 // Wave 4: Mixed enemies must all be defeated
-                if (allEnemiesDestroyed||allAsteroidsDestroyed) {
+                if (allEnemiesDestroyed || allAsteroidsDestroyed) {
                     logger.info("Wave 4 completed - Moving to Wave 5");
                     startNextWave();
                 }
