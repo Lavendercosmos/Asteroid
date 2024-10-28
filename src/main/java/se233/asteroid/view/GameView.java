@@ -379,7 +379,7 @@ public class GameView extends Pane {
 
             case 2:
                 // Wave 2: Regular enemies must all be defeated
-                if (allEnemiesDestroyed&&allAsteroidsDestroyed) {
+                if (allEnemiesDestroyed||allAsteroidsDestroyed) {
                     logger.info("Wave 2 completed - Moving to Wave 3");
                     startNextWave();
                 }
@@ -387,7 +387,7 @@ public class GameView extends Pane {
 
             case 3:
                 // Wave 3: Second-tier enemies must all be defeated
-                if (allEnemiesDestroyed&&allAsteroidsDestroyed) {
+                if (allEnemiesDestroyed||allAsteroidsDestroyed) {
                     logger.info("Wave 3 completed - Moving to Wave 4");
                     startNextWave();
                 }
@@ -395,7 +395,7 @@ public class GameView extends Pane {
 
             case 4:
                 // Wave 4: Mixed enemies must all be defeated
-                if (allEnemiesDestroyed&&allAsteroidsDestroyed) {
+                if (allEnemiesDestroyed||allAsteroidsDestroyed) {
                     logger.info("Wave 4 completed - Moving to Wave 5");
                     startNextWave();
                 }
