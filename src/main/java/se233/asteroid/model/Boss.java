@@ -26,7 +26,7 @@ public class Boss extends Character {
 
     // Sprite paths
     private static final String BOSS_NORMAL_SPRITE = "/se233/asteroid/assets/Boss/Boss.png";
-    private static final String BOSS_SHOOT_SPRITE = "/se233/asteroid/assets/Boss/boss_shoot.png";
+    private static final String BOSS_SHOOT_SPRITE = "/se233/asteroid/assets/Boss/Boss_shoot.png";
     private static final String BOSS_EXPLOSION_SPRITE = "/se233/asteroid/assets/Boss/Explosion_Boss.png";
 
     // Sprite animation
