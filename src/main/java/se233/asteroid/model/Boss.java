@@ -4,6 +4,7 @@ import javafx.geometry.Point2D;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
+import javafx.scene.layout.Pane;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -12,6 +13,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import javafx.scene.Group;
+import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Text;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+
+import static se233.asteroid.util.SpriteSheetUtils.extractFrames;
 
 public class Boss extends Character {
     private static final Logger logger = LogManager.getLogger(Boss.class);
@@ -24,12 +35,12 @@ public class Boss extends Character {
     private static final double BULLET_COOLDOWN = 0.5; // seconds
     private static final int RADIAL_BULLET_COUNT = 8;
 
-    // Sprite paths
+    // Sprite paths - Updated to use consistent lowercase paths
     private static final String BOSS_NORMAL_SPRITE = "/se233/asteroid/assets/Boss/Boss.png";
-    private static final String BOSS_SHOOT_SPRITE = "/se233/asteroid/assets/Boss/Boss_shoot.png";
+    private static final String BOSS_SHOOT_SPRITE = "/se233/asteroid/assets/Boss/Boss_shot.png";  // Changed from boss_shoot.png
     private static final String BOSS_EXPLOSION_SPRITE = "/se233/asteroid/assets/Boss/Explosion_Boss.png";
 
-    // Sprite animation
+    // Rest of the class remains unchanged...
     private Map<String, Image[]> spriteAnimations;
     private int currentFrame = 0;
     private double frameTime = 0;
@@ -55,6 +66,15 @@ public class Boss extends Character {
     private double horizontalSpeed;  // For zigzag pattern
     private double lastUpdateTime;
 
+    // Health bar components
+    private static final double HEALTH_BAR_WIDTH = 100;
+    private static final double HEALTH_BAR_HEIGHT = 10;
+    private StackPane healthBarGroup;
+    private Rectangle healthBarBackground;
+    private Rectangle healthBarFill;
+    private Text healthText;
+    private Text enragedText;
+
     // Enum for attack patterns
     private enum AttackPattern {
         CIRCLE,
@@ -67,63 +87,198 @@ public class Boss extends Character {
     public Boss(Point2D startPosition, int wave) {
         super(BOSS_NORMAL_SPRITE, startPosition, 50.0);
 
-        this.wave = wave;
-        this.maxHealth = BASE_HEALTH * wave;
-        this.health = maxHealth;
-        this.activeBullets = new CopyOnWriteArrayList<>();
-        this.random = new Random();
-        this.initialPosition = startPosition;
-        this.currentPattern = AttackPattern.CIRCLE;
-        this.timeSinceLastPatternChange = 0;
-        this.timeSinceLastShot = 0;
-        this.patternTimer = 0;
-        this.isEnraged = false;
-        this.horizontalSpeed = BASE_SPEED;
-        this.lastUpdateTime = System.nanoTime();
+        try {
+            this.wave = wave;
+            this.maxHealth = BASE_HEALTH * wave;
+            this.health = maxHealth;
+            this.activeBullets = new CopyOnWriteArrayList<>();
+            this.random = new Random();
+            this.initialPosition = startPosition;
+            this.currentPattern = AttackPattern.CIRCLE;
+            this.timeSinceLastPatternChange = 0;
+            this.timeSinceLastShot = 0;
+            this.patternTimer = 0;
+            this.isEnraged = false;
+            this.horizontalSpeed = BASE_SPEED;
+            this.lastUpdateTime = System.nanoTime();
 
-        initializeSpriteAnimations();
-        logger.info("Boss created at position: {} with health: {}", startPosition, health);
+            // Initialize health bar
+            initializeHealthBar();
+
+            initializeSpriteAnimations();
+
+            logger.info("Boss created at position: {} with health: {}", startPosition, health);
+        } catch (Exception e) {
+        logger.error("Failed to initialize boss: {}", e.getMessage());
+        throw new RuntimeException("Failed to initialize boss", e);
     }
+}
 
     private void initializeSpriteAnimations() {
         spriteAnimations = new HashMap<>();
         try {
+            logger.debug("Attempting to load boss sprites from paths:");
+            logger.debug("Normal: {}", BOSS_NORMAL_SPRITE);
+            logger.debug("Shoot: {}", BOSS_SHOOT_SPRITE);
+            logger.debug("Explosion: {}", BOSS_EXPLOSION_SPRITE);
+
             // Load normal boss sprite
             Image bossNormal = new Image(getClass().getResourceAsStream(BOSS_NORMAL_SPRITE));
             spriteAnimations.put("normal", new Image[]{bossNormal});
 
             // Load shooting animation frames
+            // Note: Boss_shot.png appears to be a single image, not a sprite sheet
             Image shootSprite = new Image(getClass().getResourceAsStream(BOSS_SHOOT_SPRITE));
-            Image[] shootFrames = extractFrames(shootSprite, 2); // 2 frames for shooting
-            spriteAnimations.put("shoot", shootFrames);
+            spriteAnimations.put("shoot", new Image[]{shootSprite});
 
             // Load explosion animation frames
-            Image explosionSprite = new Image(getClass().getResourceAsStream(BOSS_EXPLOSION_SPRITE));
-            Image[] explosionFrames = extractFrames(explosionSprite, 8); // 8 frames for explosion
-            spriteAnimations.put("explosion", explosionFrames);
+            // The explosion sprite appears to have 8 frames
+            List<Image> explosionFrames = extractFrames(BOSS_EXPLOSION_SPRITE, 8, false);
+            spriteAnimations.put("explosion", explosionFrames.toArray(new Image[0]));
+
+            logger.info("Successfully loaded all boss sprites");
 
         } catch (Exception e) {
-            logger.error("Failed to load boss sprites: {}", e.getMessage());
+            logger.error("Failed to load boss sprites: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to load boss sprites", e);
         }
     }
 
-    private Image[] extractFrames(Image spriteSheet, int frameCount) {
-        Image[] frames = new Image[frameCount];
-        int frameWidth = (int) (spriteSheet.getWidth() / frameCount);
-        int frameHeight = (int) spriteSheet.getHeight();
-        PixelReader reader = spriteSheet.getPixelReader();
+    private void initializeHealthBar() {
+        // Use StackPane instead of Group
+        healthBarGroup = new StackPane();
 
-        for (int i = 0; i < frameCount; i++) {
-            WritableImage frame = new WritableImage(frameWidth, frameHeight);
-            frame.getPixelWriter().setPixels(
-                    0, 0,
-                    frameWidth, frameHeight,
-                    reader,
-                    i * frameWidth, 0
-            );
-            frames[i] = frame;
+        // Create background bar
+        healthBarBackground = new Rectangle(HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT);
+        healthBarBackground.setFill(Color.rgb(50, 50, 50, 0.8));
+        healthBarBackground.setArcWidth(5);
+        healthBarBackground.setArcHeight(5);
+
+        // Create health fill bar
+        healthBarFill = new Rectangle(HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT);
+        healthBarFill.setFill(Color.GREEN);
+        healthBarFill.setArcWidth(5);
+        healthBarFill.setArcHeight(5);
+
+        // Create health percentage text
+        healthText = new Text(String.format("%.0f%%", getHealthPercentage() * 100));
+        healthText.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        healthText.setFill(Color.WHITE);
+        healthText.setTranslateX(HEALTH_BAR_WIDTH / 2 - 15);
+        healthText.setTranslateY(HEALTH_BAR_HEIGHT - 1);
+
+        // Create enraged text
+        enragedText = new Text("ENRAGED");
+        enragedText.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        enragedText.setFill(Color.RED);
+        enragedText.setTranslateX(HEALTH_BAR_WIDTH / 2 - 30);
+        enragedText.setTranslateY(-5);
+        enragedText.setVisible(false);
+
+        // Add all components to the StackPane
+        healthBarGroup.getChildren().addAll(
+                healthBarBackground,
+                healthBarFill,
+                healthText,
+                enragedText
+        );
+
+        // Position health bar above the boss sprite
+        updateHealthBarPosition();
+
+        // Add health bar group to the scene
+        if (getSprite().getParent() instanceof Pane) {
+            ((Pane) getSprite().getParent()).getChildren().add(healthBarGroup);
         }
-        return frames;
+    }
+
+    public void takeDamage(int damage) {
+        health -= damage;
+        isExploding = true;
+        currentFrame = 0;
+
+        logger.info("Boss hit! Health remaining: {}/{}", health, maxHealth);
+
+        // Update health bar immediately when hit
+        if (health > 0) {
+            updateHealthBar();
+        } else {
+            setAlive(false);
+            if (healthBarGroup != null) {
+                healthBarGroup.setVisible(false);
+            }
+            logger.info("Boss defeated!");
+        }
+    }
+
+    private void updateHealthBarPosition() {
+        // Position health bar above the boss
+        double xOffset = -HEALTH_BAR_WIDTH / 2;
+        double yOffset = -getSprite().getBoundsInLocal().getHeight() / 2 - HEALTH_BAR_HEIGHT - 10;
+
+        healthBarGroup.setTranslateX(getPosition().getX() + xOffset);
+        healthBarGroup.setTranslateY(getPosition().getY() + yOffset);
+    }
+
+    private void updateHealthBar() {
+        // Update health bar fill width based on current health
+        double healthPercentage = getHealthPercentage();
+        healthBarFill.setWidth(HEALTH_BAR_WIDTH * healthPercentage);
+
+        // Update health text
+        healthText.setText(String.format("%.0f%%", healthPercentage * 100));
+
+        // Update health bar color based on health and enraged state
+        if (isEnraged) {
+            healthBarFill.setFill(Color.RED);
+            enragedText.setVisible(true);
+        } else if (healthPercentage > 0.6) {
+            healthBarFill.setFill(Color.GREEN);
+            enragedText.setVisible(false);
+        } else if (healthPercentage > 0.3) {
+            healthBarFill.setFill(Color.YELLOW);
+            enragedText.setVisible(false);
+        } else {
+            healthBarFill.setFill(Color.ORANGE);
+            enragedText.setVisible(false);
+        }
+
+        // Update position to follow boss
+        updateHealthBarPosition();
+    }
+
+    public void hit(int damage) {
+        takeDamage(damage);
+    }
+
+
+
+    @Override
+    public void update() {
+        super.update();
+
+        if (isAlive()) {
+            updateHealthBar();
+        } else if (healthBarGroup != null) {
+            // Remove health bar when boss is defeated
+            healthBarGroup.setVisible(false);
+        }
+    }
+
+    @Override
+    public void setPosition(Point2D position) {
+        super.setPosition(position);
+        if (healthBarGroup != null) {
+            updateHealthBarPosition();
+        }
+    }
+
+
+    // Add cleanup method
+    public void cleanup() {
+        if (healthBarGroup != null && healthBarGroup.getParent() instanceof Pane) {
+            ((Pane) healthBarGroup.getParent()).getChildren().remove(healthBarGroup);
+        }
     }
 
     public void update(double deltaTime, Point2D playerPosition) {
@@ -387,18 +542,6 @@ public class Boss extends Character {
         }
     }
 
-    public void hit(int damage) {
-        health -= damage;
-        isExploding = true;
-        currentFrame = 0;
-
-        logger.info("Boss hit! Health remaining: {}/{}", health, maxHealth);
-
-        if (health <= 0) {
-            setAlive(false);
-            logger.info("Boss defeated!");
-        }
-    }
 
     private Point2D getRandomPosition() {
         return new Point2D(

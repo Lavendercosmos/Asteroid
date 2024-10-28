@@ -298,8 +298,12 @@ public class GameView extends Pane {
 
     private void handleBossHit() {
         boss.hit(10);
+        // Update health bar in GameStage
+        gameStage.updateBossHealth(boss.getHealthPercentage(), boss.isEnraged());
+
         if (!boss.isAlive()) {
             gameStage.showExplosion(boss.getPosition());
+            gameStage.hideBossHealth(); // Hide health bar when boss dies
             increaseScore(5000);
             startNextWave();
         }
@@ -452,7 +456,8 @@ public class GameView extends Pane {
         Point2D spawnPos = new Point2D(DEFAULT_WIDTH/2, -50);
         boss = new Boss(spawnPos, currentWave);
         gameStage.addGameObject(boss);
-
+        // Initialize boss health bar
+        gameStage.updateBossHealth(1.0, false); // Start with full health
     }
 
     private void spawnAsteroid() {
@@ -553,22 +558,22 @@ public class GameView extends Pane {
 
 
     public void resetGame() {
-        // Clear all game objects
+        // Existing clear code...
         gameObjects.clear();
         bullets.clear();
         enemies.clear();
-        boss = null;
+        if (boss != null) {
+            gameStage.hideBossHealth(); // Hide health bar when resetting game
+            boss = null;
+        }
         player = null;
 
-        // Reset game state
+        // Rest of existing reset code...
         isGameStarted = false;
         isPaused = false;
         currentWave = 1;
         currentScore = 0;
-
-        // Reset UI
         gameStage.reset();
-
         logger.info("Game reset");
     }
 

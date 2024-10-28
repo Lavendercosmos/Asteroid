@@ -17,6 +17,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
@@ -203,12 +204,13 @@ public class GameStage extends Pane {
         }
     }
 
-    private void setupUI() {
+    public void setupUI() {
         setupHUD();
         setupStartMenu();
         setupPauseMenu();
         setupGameOverScreen();
         setupVictoryScreen();
+        setupBossHealthBar(); // Add this line
         logger.debug("UI setup completed");
     }
 
@@ -875,57 +877,167 @@ public class GameStage extends Pane {
         return rotate;
     }
 
-    // Getters and utility methods
-    public Button getStartButton() { return startButton; }
-    public Button getRestartButton() { return restartButton; }
-    public Button getResumeButton() { return resumeButton; }
-    public boolean isGameStarted() { return isGameStarted; }
-    public boolean isPaused() { return isPaused; }
+    private void setupBossHealthBar() {
+        // Create boss health bar container
+        Group bossHealthGroup = new Group();
 
-    public void reset() {
-        // Reset game state
-        isGameStarted = false;
-        isPaused = false;
-        currentWave = 1;
-        currentLives = 3;
-        resetScore();
+        // Background bar
+        Rectangle healthBarBg = new Rectangle(400, 20);
+        healthBarBg.setFill(Color.rgb(60, 60, 60, 0.8));
+        healthBarBg.setStroke(Color.BLACK);
+        healthBarBg.setStrokeWidth(2);
+        healthBarBg.setArcWidth(10);
+        healthBarBg.setArcHeight(10);
 
-        // Reset UI elements
-        scoreText.setText("Score: 0");
-        livesText.setText("Lives: 3");
-        waveText.setText("Wave: 1");
+        // Health bar
+        Rectangle healthBar = new Rectangle(400, 20);
+        healthBar.setFill(Color.RED);
+        healthBar.setArcWidth(10);
+        healthBar.setArcHeight(10);
 
-        // Clear all layers
-        gameLayer.getChildren().clear();
-        effectLayer.getChildren().clear();
-        particleLayer.getChildren().clear();
+        // Enraged indicator
+        Text enragedText = new Text("ENRAGED");
+        enragedText.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+        enragedText.setFill(Color.RED);
+        enragedText.setStroke(Color.BLACK);
+        enragedText.setStrokeWidth(1);
+        enragedText.setVisible(false);
+        enragedText.setX(410);
+        enragedText.setY(15);
 
-        // Reset background
-        setupBackground();
+        bossHealthGroup.getChildren().addAll(healthBarBg, healthBar, enragedText);
+        bossHealthGroup.setTranslateX((WINDOW_WIDTH - 400) / 2);
+        bossHealthGroup.setTranslateY(20);
+        bossHealthGroup.setVisible(false);
 
-        // Reset menus
-        startMenuGroup.setVisible(true);
-        startMenuGroup.setOpacity(1);
-        pauseMenuGroup.setVisible(false);
-        gameOverGroup.setVisible(false);
+        // Store references for updating
+        bossHealthGroup.getProperties().put("healthBar", healthBar);
+        bossHealthGroup.getProperties().put("enragedText", enragedText);
 
-        // Clear effects
-        gameLayer.setEffect(null);
+        uiLayer.getChildren().add(bossHealthGroup);
+        bossHealthGroup.toFront();
 
-        // Reset scale if needed
-        updateScale();
-
-        logger.info("Game stage reset completed");
+        // Store reference to update later
+        uiLayer.getProperties().put("bossHealthGroup", bossHealthGroup);
     }
+
+    public void updateBossHealth(double healthPercentage, boolean isEnraged) {
+        Group bossHealthGroup = (Group) uiLayer.getProperties().get("bossHealthGroup");
+        if (bossHealthGroup != null) {
+            Rectangle healthBar = (Rectangle) bossHealthGroup.getProperties().get("healthBar");
+            Text enragedText = (Text) bossHealthGroup.getProperties().get("enragedText");
+
+            // Show health bar if not visible
+            if (!bossHealthGroup.isVisible()) {
+                bossHealthGroup.setVisible(true);
+
+                // Entrance animation
+                bossHealthGroup.setScaleX(0);
+                ScaleTransition st = new ScaleTransition(Duration.seconds(0.3), bossHealthGroup);
+                st.setToX(1);
+                st.play();
+            }
+
+            // Update health bar width with animation
+            double targetWidth = 400 * healthPercentage;
+            Timeline timeline = new Timeline(
+                    new KeyFrame(Duration.seconds(0.2),
+                            new KeyValue(healthBar.widthProperty(), targetWidth, Interpolator.EASE_OUT)
+                    )
+            );
+            timeline.play();
+
+            // Update color based on health percentage
+            Color healthColor;
+            if (healthPercentage > 0.6) {
+                healthColor = Color.RED;
+            } else if (healthPercentage > 0.3) {
+                healthColor = Color.ORANGE;
+            } else {
+                healthColor = Color.rgb(255, 50, 50); // Bright red
+            }
+            healthBar.setFill(healthColor);
+
+            // Update enraged status
+            enragedText.setVisible(isEnraged);
+            if (isEnraged) {
+                // Flashing animation for enraged text
+                Timeline flash = new Timeline(
+                        new KeyFrame(Duration.seconds(0.5), new KeyValue(enragedText.opacityProperty(), 1.0)),
+                        new KeyFrame(Duration.seconds(1.0), new KeyValue(enragedText.opacityProperty(), 0.3))
+                );
+                flash.setCycleCount(Timeline.INDEFINITE);
+                flash.play();
+            }
+        }
+    }
+
+    public void hideBossHealth() {
+        Group bossHealthGroup = (Group) uiLayer.getProperties().get("bossHealthGroup");
+        if (bossHealthGroup != null && bossHealthGroup.isVisible()) {
+            // Exit animation
+            ScaleTransition st = new ScaleTransition(Duration.seconds(0.3), bossHealthGroup);
+            st.setToX(0);
+            st.setOnFinished(e -> bossHealthGroup.setVisible(false));
+            st.play();
+        }
+    }
+
+        // Getters and utility methods
+        public Button getStartButton () {
+            return startButton;
+        }
+        public Button getRestartButton () {
+            return restartButton;
+        }
+        public Button getResumeButton () {
+            return resumeButton;
+        }
+        public boolean isGameStarted () {
+            return isGameStarted;
+        }
+        public boolean isPaused () {
+            return isPaused;
+        }
+
+        public void reset () {
+            // Reset game state
+            isGameStarted = false;
+            isPaused = false;
+            currentWave = 1;
+            currentLives = 3;
+            resetScore();
+
+            // Reset UI elements
+            scoreText.setText("Score: 0");
+            livesText.setText("Lives: 3");
+            waveText.setText("Wave: 1");
+
+            // Clear all layers
+            gameLayer.getChildren().clear();
+            effectLayer.getChildren().clear();
+            particleLayer.getChildren().clear();
+
+            // Reset background
+            setupBackground();
+
+            // Reset menus
+            startMenuGroup.setVisible(true);
+            startMenuGroup.setOpacity(1);
+            pauseMenuGroup.setVisible(false);
+            gameOverGroup.setVisible(false);
+
+            // Clear effects
+            gameLayer.setEffect(null);
+
+            // Reset scale if needed
+            updateScale();
+
+            logger.info("Game stage reset completed");
+        }
 
     public double getStageWidth() { return WINDOW_WIDTH * scale.getX(); }
     public double getStageHeight() { return WINDOW_HEIGHT * scale.getY(); }
-    public double getCurrentScaleX() {
-        return scale.getX();
-    }
-
-    public double getCurrentScaleY() {
-        return scale.getY();
-    }
-
+    public double getCurrentScaleX() {return scale.getX();}
+    public double getCurrentScaleY() { return scale.getY();}
 }
