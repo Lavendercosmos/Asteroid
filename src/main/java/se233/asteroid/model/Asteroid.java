@@ -38,6 +38,7 @@ public class Asteroid extends Character {
     // Asteroid properties
     private final Type type;
     private final int points;
+    private int size;
     private boolean isExploding;
     private List<Image> explosionFrames;
     private int currentExplosionFrame;
@@ -57,6 +58,7 @@ public class Asteroid extends Character {
                 type == Type.ASTEROID ? ASTEROID_RADIUS : METEOR_RADIUS);
 
         this.type = type;
+        this.size = size; // 1 for small, 2 for large
         this.isInvulnerable = false;
         this.points = 100; // Fixed points for destroying asteroid
         this.isExploding = false;

@@ -157,4 +157,25 @@ public class Bullet extends Character {
         active = false;
         logger.debug("Bullet disposed");
     }
+
+    /**
+     * Checks if this bullet was fired by the player.
+     * @return true if the bullet was fired by the player, false if fired by an enemy
+     */
+    public boolean isFromPlayer() {
+        return !isEnemyBullet;
+    }
+
+    // Alternative way - you can replace the checks in GameController with this method
+    public boolean canScore() {
+        return isFromPlayer() && active;
+    }
+
+    /**
+     * Checks if the bullet is currently active.
+     * @return true if the bullet is active, false otherwise
+     */
+    public boolean isActive() {
+        return active;
+    }
 }
