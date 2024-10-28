@@ -277,7 +277,7 @@ public class PlayerShip extends Character {
     public void hit() {
         if (!isInvulnerable && !isExploding && isAlive) {
             lives--;
-               //explode();
+
             logger.info("Ship hit! Lives remaining: {}", lives);
 
             if (lives <= 0) {
@@ -295,19 +295,23 @@ public class PlayerShip extends Character {
         // หยุดการเคลื่อนที่
         velocity = new Point2D(0, 0);
 
+
         // ปรับขนาด sprite สำหรับการระเบิด
-        sprite.setFitWidth(hitRadius * 4);
-        sprite.setFitHeight(hitRadius * 4);
+        sprite.setFitWidth(hitRadius * 3);
+        sprite.setFitHeight(hitRadius * 3);
 
         // ปรับตำแหน่งให้ centered
         sprite.setTranslateX(position.getX() - sprite.getFitWidth()/2);
         sprite.setTranslateY(position.getY() - sprite.getFitHeight()/2);
 
+        sprite.setVisible(false);  // ซ่อน sprite
+        sprite.setImage(null);     // ลบรูปภาพ
+        isAlive = false;           // ตั้งค่าว่าตายแล้ว
 //        explosionAnimation.play();
 //        explosionAnimation.setOnFinished(e -> {
-            sprite.setVisible(false);  // ซ่อน sprite
-            sprite.setImage(null);     // ลบรูปภาพ
-            isAlive = false;           // ตั้งค่าว่าตายแล้ว
+//            sprite.setVisible(false);  // ซ่อน sprite
+//            sprite.setImage(null);     // ลบรูปภาพ
+//            isAlive = false;           // ตั้งค่าว่าตายแล้ว
 //        });
 
         stopThrust(); // หยุด thruster
@@ -352,6 +356,21 @@ public class PlayerShip extends Character {
         logger.debug("Invulnerability started");
     }
 
+    public void activateShield() {
+        if (isAlive && !isExploding) {
+            isInvulnerable = true;
+            shieldSprite.setVisible(true);
+
+            Timeline shieldTimer = new Timeline(
+                    new KeyFrame(Duration.seconds(5), e -> {
+                        isInvulnerable = false;
+                        shieldSprite.setVisible(false);
+                    })
+            );
+            shieldTimer.play();
+            logger.debug("Shield activated");
+        }
+    }
 
     public void reset() {
         lives = 3;
@@ -429,6 +448,3 @@ public class PlayerShip extends Character {
         }
     }
 }
-
-
-
