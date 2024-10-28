@@ -33,11 +33,13 @@ public class Launcher extends Application {
 
             // Get screen dimensions
             Rectangle2D screenBounds = Screen.getPrimary().getVisualBounds();
-            double initialWidth = Math.min(GameView.DEFAULT_WIDTH, screenBounds.getWidth() * 0.8);
-            double initialHeight = Math.min(GameView.DEFAULT_HEIGHT, screenBounds.getHeight() * 0.8);
 
-            // Create scene
-            scene = new Scene(rootPane, initialWidth, initialHeight);
+            // Use fixed dimensions instead of calculating from screen size
+            double fixedWidth = GameView.DEFAULT_WIDTH;
+            double fixedHeight = GameView.DEFAULT_HEIGHT;
+
+            // Create scene with fixed dimensions
+            scene = new Scene(rootPane, fixedWidth, fixedHeight);
 
             // Setup controls
             setupControls();
@@ -45,40 +47,22 @@ public class Launcher extends Application {
             // Configure stage
             stage.setTitle("Asteroid Game");
             stage.setScene(scene);
-            stage.setResizable(true);
+            stage.setResizable(false); // Disable resizing
 
-            // Center the stage
-            stage.setX((screenBounds.getWidth() - initialWidth) / 2);
-            stage.setY((screenBounds.getHeight() - initialHeight) / 2);
-
-            // Setup resize handlers
-            setupResizeHandlers(stage);
+            // Center the stage on screen
+            stage.setX((screenBounds.getWidth() - fixedWidth) / 2);
+            stage.setY((screenBounds.getHeight() - fixedHeight) / 2);
 
             // Setup start button
             gameView.getStartButton().setOnAction(e -> gameView.startGame());
 
             stage.show();
 
-            logger.info("Game initialized successfully with dimensions: {}x{}",
-                    initialWidth, initialHeight);
+            logger.info("Game initialized with fixed dimensions: {}x{}",
+                    fixedWidth, fixedHeight);
         } catch (Exception e) {
             logger.error("Failed to start game", e);
         }
-    }
-
-    private void setupResizeHandlers(Stage stage) {
-        // Listen for window resize
-        stage.widthProperty().addListener((obs, oldVal, newVal) -> {
-            gameView.handleResize(newVal.doubleValue(), stage.getHeight());
-        });
-
-        stage.heightProperty().addListener((obs, oldVal, newVal) -> {
-            gameView.handleResize(stage.getWidth(), newVal.doubleValue());
-        });
-
-        // Set minimum window size
-        stage.setMinWidth(GameView.DEFAULT_WIDTH * 0.5);
-        stage.setMinHeight(GameView.DEFAULT_HEIGHT * 0.5);
     }
 
     private void setupControls() {
@@ -116,7 +100,7 @@ public class Launcher extends Application {
             }
         });
 
-        // Setup continuous input handlingsss
+        // Setup continuous input handling
         new javafx.animation.AnimationTimer() {
             @Override
             public void handle(long now) {
