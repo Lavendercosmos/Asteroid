@@ -24,9 +24,9 @@ public class Asteroid extends Character {
     // Constants - simplified for small asteroids only
     private static final double ASTEROID_SPEED = 1.0;
     private static final double ROTATION_SPEED = 2.0;
-    private static final double ASTEROID_RADIUS = 30;
+    private static final double ASTEROID_RADIUS = 15;
     private static final int EXPLOSION_FRAMES = 5;
-    private static final Duration FRAME_DURATION = Duration.millis(100);
+    private static final Duration FRAME_DURATION = Duration.millis(50); //ในการลดระยะเวลา cooldown ของการระเบิดอุกาบาต
 
     // Asteroid properties
     private final int points;
@@ -149,15 +149,20 @@ public class Asteroid extends Character {
             isExploding = true;
             currentExplosionFrame = 0;
 
+            // ใช้ตำแหน่งปัจจุบันของ asteroid
+            double asteroidX = position.getX() - baseWidth/2;
+            double asteroidY = position.getY() - baseHeight/2;
+
             // ไม่ต้องปรับขนาด sprite ให้ใหญ่ขึ้น ใช้ขนาดเดิม
             sprite.setFitWidth(baseWidth );  // ใช้ขนาดเดิมของ asteroid
             sprite.setFitHeight(baseHeight );
 
             // ปรับตำแหน่งให้ centered
-            sprite.setTranslateX(position.getX() - sprite.getFitWidth()/2);
-            sprite.setTranslateY(position.getY() - sprite.getFitHeight()/2);
+            sprite.setTranslateX(asteroidX);
+            sprite.setTranslateY(asteroidY);
 
             // Start explosion animation
+            setupExplosionAnimation();
             explosionAnimation.play();
 
             // ลบ sprite เมื่อ animation จบ
@@ -192,7 +197,7 @@ public class Asteroid extends Character {
             double scale = Math.min(scaleX, scaleY);
 
             for (int i = 0; i < EXPLOSION_FRAMES; i++) {
-                Canvas canvas = new Canvas(frameWidth * scale, frameHeight * scale);
+                Canvas canvas = new Canvas(frameWidth* scale, frameHeight* scale);
                 GraphicsContext gc = canvas.getGraphicsContext2D();
 
                 gc.drawImage(explodeSheet,
@@ -213,27 +218,31 @@ public class Asteroid extends Character {
         return frames;
     }
 
+    // การระเบิดที่ทำให้ sprite แตก
     private void setupExplosionAnimation() {
-        explosionAnimation = new Timeline(
-                new KeyFrame(FRAME_DURATION, e -> {
-                    if (currentExplosionFrame < explosionFrames.size()) {
-                        sprite.setImage(explosionFrames.get(currentExplosionFrame));
-                        // Scale explosion frame to match original asteroid size
+        explosionAnimation = new Timeline();
+
+                Duration frameTime = Duration.millis(100);
+
+        for (int i = 0; i < explosionFrames.size(); i++) {
+            final int frameIndex = i;
+            KeyFrame keyFrame = new KeyFrame(
+                    frameTime.multiply(i + 1),
+                    e -> {
+                        sprite.setImage(explosionFrames.get(frameIndex));
                         sprite.setFitWidth(baseWidth);
                         sprite.setFitHeight(baseHeight);
-                        currentExplosionFrame++;
-                    } else {
-                        explosionAnimation.stop();
-                        sprite.setVisible(false);
-                        sprite.setImage(null);
-                        isAlive = false;
                     }
-                })
-        );
-        explosionAnimation.setCycleCount(explosionFrames.size());
+            );
+            explosionAnimation.getKeyFrames().add(keyFrame);
+        }
+
+        explosionAnimation.setOnFinished(e -> {
+            sprite.setVisible(false);
+            sprite.setImage(null);
+            isAlive = false;
+        });
     }
-
-
 
     @Override
     public void setPosition(Point2D newPosition) {

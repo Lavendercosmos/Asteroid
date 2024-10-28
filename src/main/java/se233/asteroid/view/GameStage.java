@@ -475,41 +475,6 @@ public class GameStage extends Pane {
     public void removeBullet(Bullet bullet) {
         gameLayer.getChildren().remove(bullet.getSprite());
     }
-
-    public void showShieldEffect(Point2D position) {
-        try {
-            // Create a circular shield effect
-            ImageView shieldView = new ImageView(new Image(Objects.requireNonNull(
-                    getClass().getResourceAsStream("/se233/asteroid/assets/PlayerShip/Fx_01.png")
-            )));
-
-            // Convert to screen coordinates and scale
-            Point2D screenPos = gameToScreen(position);
-            double scaledSize = 60 * scale.getX(); // Adjust size as needed
-
-            shieldView.setX(screenPos.getX() - scaledSize/2);
-            shieldView.setY(screenPos.getY() - scaledSize/2);
-            shieldView.setFitWidth(scaledSize);
-            shieldView.setFitHeight(scaledSize);
-
-            effectLayer.getChildren().add(shieldView);
-
-            // Create shield activation animation
-            double animationSpeed = 0.3 / Math.max(scale.getX(), scale.getY());
-            ParallelTransition animation = new ParallelTransition(
-                    createFadeTransition(shieldView, 0.8, 0.0, animationSpeed),
-                    createScaleTransition(shieldView, 0.8, 1.2, animationSpeed)
-            );
-            animation.setOnFinished(e -> effectLayer.getChildren().remove(shieldView));
-            animation.play();
-
-            logger.debug("Shield effect shown at position: {}", position);
-        } catch (Exception e) {
-            logger.error("Failed to show shield effect", e);
-        }
-    }
-
-    // Effects and animations
     private void showBossWarning() {
         Text warningText = new Text("WARNING!\nBOSS APPROACHING");
         warningText.setStyle(STYLE_HEADER);
@@ -553,10 +518,11 @@ public class GameStage extends Pane {
             Point2D screenPos = gameToScreen(position);
             double scaledSize = 100 * scale.getX(); // Base size for explosion
 
-            explosionView.setX(screenPos.getX() - scaledSize/2);
+            explosionView.setX(screenPos.getX() - scaledSize/2.2);
             explosionView.setY(screenPos.getY() - scaledSize/2);
             explosionView.setFitWidth(scaledSize);
             explosionView.setFitHeight(scaledSize);
+            explosionView.setViewport(new Rectangle2D(0,0,30,30));
 
             effectLayer.getChildren().add(explosionView);
 
@@ -568,7 +534,7 @@ public class GameStage extends Pane {
                 KeyFrame frame = new KeyFrame(
                         Duration.seconds(i * 0.05), // 50ms per frame
                         new KeyValue(explosionView.viewportProperty(),
-                                new Rectangle2D(i * 100, 0, 100, 100))
+                                new Rectangle2D(i * 100, 0, 30, 30))
                 );
                 explosionAnimation.getKeyFrames().add(frame);
             }
