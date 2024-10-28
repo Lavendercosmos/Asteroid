@@ -20,15 +20,23 @@ public class Asteroid extends Character {
     // Asset paths
     private static final String ASTEROID_BASE_PATH = "/se233/asteroid/assets/Astroides/Asteroid_Base.png";
     private static final String ASTEROID_EXPLODE_PATH = "/se233/asteroid/assets/Astroides/Asteroid_Explode.png";
+    private static final String METEOR_BASE_PATH = "/se233/asteroid/assets/Astroides/meteor.png";
 
     // Constants - simplified for small asteroids only
     private static final double ASTEROID_SPEED = 1.0;
+    private static final double METEOR_SPEED = 1.0;
     private static final double ROTATION_SPEED = 2.0;
-    private static final double ASTEROID_RADIUS = 15;
+    private static final double ASTEROID_RADIUS = 30;
+    private static final double METEOR_RADIUS = 25;
     private static final int EXPLOSION_FRAMES = 5;
-    private static final Duration FRAME_DURATION = Duration.millis(50); //ในการลดระยะเวลา cooldown ของการระเบิดอุกาบาต
-
+    private static final Duration FRAME_DURATION = Duration.millis(100);
+    // Type enumeration
+    public enum Type {
+        ASTEROID,
+        METEOR
+    }
     // Asteroid properties
+    private final Type type;
     private final int points;
     private boolean isExploding;
     private List<Image> explosionFrames;
@@ -41,13 +49,18 @@ public class Asteroid extends Character {
     private static final long INVULNERABLE_DURATION = 500;
     private double baseWidth;
     private double baseHeight;
+    private Color trailColor;  // For meteor trail effect
 
-    public Asteroid(Point2D position) {
-        super(ASTEROID_BASE_PATH, position, ASTEROID_RADIUS);
+    public Asteroid(Point2D position, Type type) {
+        super(type == Type.ASTEROID ? ASTEROID_BASE_PATH : METEOR_BASE_PATH,
+                position,
+                type == Type.ASTEROID ? ASTEROID_RADIUS : METEOR_RADIUS);
+
+        this.type = type;
         this.isInvulnerable = false;
         this.points = 100; // Fixed points for destroying asteroid
         this.isExploding = false;
-        this.currentSpeed = ASTEROID_SPEED;
+        this.currentSpeed = type == Type.ASTEROID ? ASTEROID_SPEED : METEOR_SPEED;
 
         // Set random direction angle in radians
         this.directionAngle = Math.random() * 2 * Math.PI;
@@ -55,6 +68,11 @@ public class Asteroid extends Character {
         // Store original asteroid dimensions
         this.baseWidth = sprite.getFitWidth();
         this.baseHeight = sprite.getFitHeight();
+
+        // Set trail color for meteors
+        this.trailColor = type == Type.METEOR ?
+                Color.rgb(255, 100, 0, 0.6) :  // Orange for meteors
+                Color.TRANSPARENT;              // No trail for asteroids
 
         // Initialize explosion frames
         this.explosionFrames = loadExplosionFrames();
@@ -101,29 +119,59 @@ public class Asteroid extends Character {
 
             // Update rotation
             rotation += ROTATION_SPEED;
-            if (rotation >= 360) {
-                rotation -= 360;
-            }
+            if (rotation >= 360) rotation -= 360;
+
 
             // Update sprite position and rotation
             updateSpritePosition();
             sprite.setRotate(rotation);
+
+            // Add meteor trail effect if it's a meteor
+            if (type == Type.METEOR && sprite.isVisible()) {
+                createMeteorTrail();
+            }
 
             logger.trace("Asteroid updated - Position: {}, Velocity: {}, Rotation: {}",
                     position, velocity, rotation);
         }
     }
 
+    private void createMeteorTrail() {
+        // Create a trail effect behind the meteor
+        Canvas trailCanvas = new Canvas(baseWidth * 1.5, baseHeight * 1.5);
+        GraphicsContext gc = trailCanvas.getGraphicsContext2D();
+
+        // Calculate trail start position (behind the meteor)
+        double trailLength = 30.0;
+        double trailAngle = Math.atan2(velocity.getY(), velocity.getX());
+        double trailStartX = position.getX() - Math.cos(trailAngle) * trailLength;
+        double trailStartY = position.getY() - Math.sin(trailAngle) * trailLength;
+
+        // Draw gradient trail
+        gc.setFill(trailColor);
+        for (int i = 0; i < 5; i++) {
+            double alpha = 0.8 - (i * 0.2);
+            gc.setFill(Color.rgb(255, 100, 0, alpha));
+            gc.fillOval(
+                    trailStartX + (i * Math.cos(trailAngle) * 5),
+                    trailStartY + (i * Math.sin(trailAngle) * 5),
+                    10 - i, 10 - i
+            );
+        }
+    }
+
     public void hit() {
         if (isAlive && !isExploding) {
-            logger.debug("Asteroid hit at position: {}", position);
+            logger.debug("{} hit at position: {}", type, position);
             explode();
         }
     }
 
+
     public List<Asteroid> split() {
         List<Asteroid> fragments = new ArrayList<>();
-        double[] angles = {-45, 45}; // กำหนดทิศทางการกระจาย
+        if (type == Type.ASTEROID) {
+            double[] angles = {-45, 45}; // กำหนดทิศทางการกระจาย
         double spreadDistance = 30.0; // ระยะห่างจากจุดเดิม
 
         for (double angle : angles) {
@@ -136,11 +184,12 @@ public class Asteroid extends Character {
             Point2D newPos = position.add(offset);
 
             // สร้าง fragment ในตำแหน่งใหม่
-            Asteroid fragment = new Asteroid(newPos);
+            Asteroid fragment = new Asteroid(newPos, Type.ASTEROID);
             fragments.add(fragment);
         }
 
-        logger.info("Asteroid split into {} fragments", fragments.size());
+        logger.info("Asteroid split into {} fragments", fragments.size());}
+
         return fragments;
     }
 
@@ -186,7 +235,9 @@ public class Asteroid extends Character {
     private List<Image> loadExplosionFrames() {
         List<Image> frames = new ArrayList<>();
         try {
-            Image explodeSheet = new Image(getClass().getResourceAsStream(ASTEROID_EXPLODE_PATH));
+            // Choose explosion sprite sheet based on type
+            String explodePath = (type == Type.ASTEROID) ? ASTEROID_EXPLODE_PATH : ASTEROID_EXPLODE_PATH;
+            Image explodeSheet = new Image(getClass().getResourceAsStream(explodePath));
 
             double frameWidth = explodeSheet.getWidth() / EXPLOSION_FRAMES;
             double frameHeight = explodeSheet.getHeight();
@@ -218,12 +269,9 @@ public class Asteroid extends Character {
         return frames;
     }
 
-    // การระเบิดที่ทำให้ sprite แตก
     private void setupExplosionAnimation() {
         explosionAnimation = new Timeline();
-
-                Duration frameTime = Duration.millis(100);
-
+        Duration frameTime = Duration.millis(100);
         for (int i = 0; i < explosionFrames.size(); i++) {
             final int frameIndex = i;
             KeyFrame keyFrame = new KeyFrame(
@@ -253,9 +301,10 @@ public class Asteroid extends Character {
     }
 
     // Getters
+    public Type getType() { return type; }
     public int getPoints() { return points; }
     public boolean isExploding() { return isExploding; }
-    public double getRadius() { return ASTEROID_RADIUS; }
+    public double getRadius() { return type == Type.ASTEROID ? ASTEROID_RADIUS : METEOR_RADIUS; }
 
     // Resource cleanup
     public void dispose() {
@@ -282,4 +331,5 @@ public class Asteroid extends Character {
         // จะชนกันก็ต่อเมื่อระยะห่างน้อยกว่าผลรวมของรัศมีทั้งสอง
         return distance < minDistance;
     }
+
 }
