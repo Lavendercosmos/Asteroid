@@ -21,7 +21,7 @@ public class GameView extends Pane {
     private static final long BULLET_COOLDOWN = 250_000_000L; // 250ms
     private static final int INITIAL_ENEMIES = 2;
     private static final double ENEMY_SPAWN_CHANCE = 0.01; // 1% chance per frame
-    private static final int MAX_ENEMIES = 3;
+    private static final int MAX_ENEMIES = 5;
     private static final int POINTS_REGULAR_ENEMY = 100;
     private static final int POINTS_SECOND_TIER_ENEMY = 250;
 
@@ -241,47 +241,26 @@ public class GameView extends Pane {
         gameStage.showExplosion(enemy.getPosition());
 
         if (!enemy.isAlive()) {
-            // ลบ enemy ออกจากทั้ง List และ GameStage
+            // ใช้ remove ที่ปลอดภัยกว่าด้วย CopyOnWriteArrayList
             enemies.remove(enemy);
-            gameStage.removeGameObject(enemy);  // เพิ่มบรรทัดนี้
-
-            // Award points
             int points = enemy.isSecondTier() ? POINTS_SECOND_TIER_ENEMY : POINTS_REGULAR_ENEMY;
             increaseScore(points);
             gameStage.showScorePopup(points, enemy.getPosition());
 
-            // ตรวจสอบจำนวน enemy ที่เหลือ
-            long remainingEnemies = enemies.stream()
-                    .filter(Character::isAlive)
-                    .count();
+            // เพิ่ม log เพื่อตรวจสอบ
+            logger.info("Enemy destroyed! Points awarded: {}, Remaining enemies: {}",
+                    points, enemies.size());
 
-            logger.info("Enemy destroyed! Points: {}, Enemies remaining: {}",
-                    points, remainingEnemies);
 
-            // ตรวจสอบการจบ wave ทันทีหลังจากทำลาย enemy
-            if (remainingEnemies == 0) {
-                logger.info("All enemies destroyed, checking wave completion");
-                checkWaveCompletion();
-            }
         }
     }
 
     private void spawnNewEnemies() {
         // Only spawn new enemies in waves 2-4
         if (currentWave >= 2 && currentWave <= 4) {
-            // Count only alive enemies for spawn check
-            long aliveEnemies = enemies.stream()
-                    .filter(Character::isAlive)
-                    .count();
-
-            // Check total enemies spawned this wave (both alive and dead)
-            long totalEnemiesThisWave = enemies.size();
-
-            // Only spawn if we haven't reached the maximum number of enemies for this wave
-            if (aliveEnemies < MAX_ENEMIES && totalEnemiesThisWave < MAX_ENEMIES &&
-                    random.nextDouble() < ENEMY_SPAWN_CHANCE) {
+            if (enemies.size() < MAX_ENEMIES && random.nextDouble() < ENEMY_SPAWN_CHANCE) {
                 spawnEnemy();
-                logger.debug("Spawned new enemy. Total enemies this wave: {}", totalEnemiesThisWave + 1);
+                logger.debug("Spawned new enemy. Total enemies: {}", enemies.size());
             }
         }
     }
@@ -310,12 +289,10 @@ public class GameView extends Pane {
     private void spawnInitialEnemies() {
         // Only spawn enemies if we're in wave 2 or higher
         if (currentWave >= 2) {
-            // Spawn initial enemies, but not more than MAX_ENEMIES
-            int enemiesToSpawn = Math.min(INITIAL_ENEMIES, MAX_ENEMIES);
-            for (int i = 0; i < enemiesToSpawn; i++) {
+            for (int i = 0; i < INITIAL_ENEMIES; i++) {
                 spawnEnemy();
             }
-            logger.info("Spawned {} initial enemies for wave {}", enemiesToSpawn, currentWave);
+            logger.info("Spawned {} initial enemies for wave {}", INITIAL_ENEMIES, currentWave);
         }
     }
 
@@ -391,65 +368,60 @@ public class GameView extends Pane {
                 .noneMatch(Character::isAlive);
         boolean bossDestroyed = (currentWave == 5 && (boss == null || !boss.isAlive()));
 
-
         switch (currentWave) {
             case 1:
+                // Wave 1: Players only deal with asteroids
                 if (allAsteroidsDestroyed) {
-                    logger.info("Wave 1 completed - All asteroids destroyed");
+                    logger.info("Wave 1 completed - Moving to Wave 2");
                     startNextWave();
                 }
                 break;
 
             case 2:
+                // Wave 2: Regular enemies must all be defeated
+                if (allEnemiesDestroyed&&allAsteroidsDestroyed) {
+                    logger.info("Wave 2 completed - Moving to Wave 3");
+                    startNextWave();
+                }
+                break;
+
             case 3:
+                // Wave 3: Second-tier enemies must all be defeated
+                if (allEnemiesDestroyed&&allAsteroidsDestroyed) {
+                    logger.info("Wave 3 completed - Moving to Wave 4");
+                    startNextWave();
+                }
+                break;
+
             case 4:
-                if (allEnemiesDestroyed || allAsteroidsDestroyed) {
-                    logger.info("Wave {} completion criteria met:", currentWave);
-                    logger.info("- All enemies destroyed: {}", allEnemiesDestroyed);
-                    logger.info("- All asteroids destroyed: {}", allAsteroidsDestroyed);
+                // Wave 4: Mixed enemies must all be defeated
+                if (allEnemiesDestroyed&&allAsteroidsDestroyed) {
+                    logger.info("Wave 4 completed - Moving to Wave 5");
                     startNextWave();
                 }
                 break;
 
             case 5:
+                // Wave 5: Boss battle
                 if (bossDestroyed) {
-                    logger.info("Wave 5 completed - Boss destroyed");
-                    startNextWave();
+                    logger.info("Wave 5 completed - Game Over");
+                    startNextWave(); // จะไปเรียก endGame()
                 }
                 break;
         }
     }
-
-//    private void checkWaveCompletion() {
-//        boolean allEnemiesDestroyed = enemies.isEmpty();
-//        boolean allAsteroidsDestroyed = gameObjects.stream()
-//                .filter(obj -> obj instanceof Asteroid)
-//                .noneMatch(Character::isAlive);
-//        boolean bossDestroyed = (currentWave == 5 && (boss == null || !boss.isAlive()));
-//
-//        // แก้ไขเงื่อนไขให้จบ wave ได้ง่ายขึ้น
-//        boolean regularWaveCleared = (currentWave < 5 &&
-//                (allEnemiesDestroyed || allAsteroidsDestroyed));
-//
-//        if (bossDestroyed || regularWaveCleared) {
-//            startNextWave();
-//        }
-//    }
 
 
 
 
     private void startNextWave() {
         currentWave++;
-        logger.info("=== Starting Wave {} ===", currentWave);
+        logger.info("Starting Wave {}", currentWave);
+        gameStage.updateWave(currentWave);
 
-        // Clear objects from previous wave
+        // เคลียร์ enemies และ asteroids จากรอบก่อนหน้า
         enemies.clear();
         gameObjects.removeIf(obj -> obj instanceof Asteroid);
-        //gameStage.clearAsteroids();
-
-        // Update UI
-        gameStage.updateWave(currentWave);
 
         if (currentWave == 5) {
             spawnBoss();
@@ -457,11 +429,11 @@ public class GameView extends Pane {
             endGame();
         } else {
             spawnAsteroids();
+            // Ensure enemies are spawned immediately for waves 2-4
             if (currentWave >= 2) {
                 spawnInitialEnemies();
-                logger.info("Initial setup for wave {}:", currentWave);
-                logger.info("- Spawned {} initial enemies", Math.min(INITIAL_ENEMIES, MAX_ENEMIES));
-                logger.info("- Spawned asteroids");
+                logger.info("Initial enemies spawned for wave {}: {}",
+                        currentWave, enemies.size());
             }
         }
     }
@@ -488,22 +460,52 @@ public class GameView extends Pane {
         double y = Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50;
         Point2D spawnPos = new Point2D(x, y);
 
-        // สร้างอุกาบาตขนาดเดียว
-        Asteroid asteroid = new Asteroid(spawnPos);
+        // Create an asteroid
+        Asteroid asteroid = new Asteroid(spawnPos, Asteroid.Type.ASTEROID);
         addGameObject(asteroid);
     }
 
 
     private void spawnAsteroids() {
-        // ปรับจำนวนอุกาบาตตาม wave
-        int baseCount = 4;
-        int additionalCount = (currentWave - 1) * 2;
-        int totalCount = Math.min(baseCount + additionalCount, 12);
+        if (currentWave == 1) {
+            // Wave 1: 2 ASTEROID และ 2 METEOR แน่นอน
+            for (int i = 0; i < 2; i++) {
+                // สร้าง ASTEROID
+                Point2D asteroidPos = new Point2D(
+                        Math.random() * DEFAULT_WIDTH,
+                        Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50
+                );
+                Asteroid asteroid = new Asteroid(asteroidPos, Asteroid.Type.ASTEROID);
+                addGameObject(asteroid);
 
-        for (int i = 0; i < totalCount; i++) {
-            spawnAsteroid();
+                // สร้าง METEOR
+                Point2D meteorPos = new Point2D(
+                        Math.random() * DEFAULT_WIDTH,
+                        Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50
+                );
+                Asteroid meteor = new Asteroid(meteorPos, Asteroid.Type.METEOR);
+                addGameObject(meteor);
+            }
+            logger.info("Wave 1: Spawned 2 asteroids and 2 meteors");
+        } else {
+            // Wave 2-5: สุ่มเกิด 5 อุกาบาตจาก ASTEROID และ METEOR
+            for (int i = 0; i < 5; i++) {
+                Point2D spawnPos = new Point2D(
+                        Math.random() * DEFAULT_WIDTH,
+                        Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50
+                );
+
+                // สุ่มว่าจะเป็น ASTEROID หรือ METEOR (50-50)
+                if (Math.random() < 0.5) {
+                    Asteroid asteroid = new Asteroid(spawnPos, Asteroid.Type.ASTEROID);
+                    addGameObject(asteroid);
+                } else {
+                    Asteroid meteor = new Asteroid(spawnPos, Asteroid.Type.METEOR);
+                    addGameObject(meteor);
+                }
+            }
+            logger.info("Wave {}: Spawned 5 random objects", currentWave);
         }
-        logger.info("Spawned {} asteroids for wave {}", totalCount, currentWave);
     }
 
     private void increaseScore(int points) {
