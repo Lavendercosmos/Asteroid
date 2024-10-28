@@ -46,7 +46,7 @@ public class PlayerShip extends Character {
     private static final String SHIELD_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Shield.png";
 
     public PlayerShip(Point2D startPosition) {
-        super(SHIP_SPRITE_PATH, startPosition, 20);
+        super(SHIP_SPRITE_PATH, startPosition, 5);
         initializeShip();
         initializeSprites();  // Move this before setupAnimations
         setupAnimations();
@@ -65,8 +65,8 @@ public class PlayerShip extends Character {
     private void initializeSprites() {
         try {
             // Setup main ship sprite size
-            sprite.setFitWidth(60);
-            sprite.setFitHeight(60);
+            sprite.setFitWidth(30);
+            sprite.setFitHeight(30);
             sprite.setPreserveRatio(true);
 
             // Initialize thruster sprite with error checking
@@ -75,8 +75,8 @@ public class PlayerShip extends Character {
                 throw new RuntimeException("Could not find thruster sprite: " + THRUSTER_SPRITE_PATH);
             }
             thrusterSprite = new ImageView(new Image(thrusterStream));
-            thrusterSprite.setFitWidth(30);
-            thrusterSprite.setFitHeight(30);
+            thrusterSprite.setFitWidth(25);
+            thrusterSprite.setFitHeight(25);
             thrusterSprite.setPreserveRatio(true);
             thrusterSprite.setVisible(false);
 
@@ -86,8 +86,8 @@ public class PlayerShip extends Character {
                 throw new RuntimeException("Could not find shield sprite: " + SHIELD_SPRITE_PATH);
             }
             shieldSprite = new ImageView(new Image(shieldStream));
-            shieldSprite.setFitWidth(60);
-            shieldSprite.setFitHeight(60);
+            shieldSprite.setFitWidth(25);
+            shieldSprite.setFitHeight(25);
             shieldSprite.setPreserveRatio(true);
             shieldSprite.setVisible(false);
 
@@ -277,6 +277,7 @@ public class PlayerShip extends Character {
     public void hit() {
         if (!isInvulnerable && !isExploding && isAlive) {
             lives--;
+               //explode();
             logger.info("Ship hit! Lives remaining: {}", lives);
 
             if (lives <= 0) {
@@ -302,12 +303,12 @@ public class PlayerShip extends Character {
         sprite.setTranslateX(position.getX() - sprite.getFitWidth()/2);
         sprite.setTranslateY(position.getY() - sprite.getFitHeight()/2);
 
-        explosionAnimation.play();
-        explosionAnimation.setOnFinished(e -> {
+//        explosionAnimation.play();
+//        explosionAnimation.setOnFinished(e -> {
             sprite.setVisible(false);  // ซ่อน sprite
             sprite.setImage(null);     // ลบรูปภาพ
             isAlive = false;           // ตั้งค่าว่าตายแล้ว
-        });
+//        });
 
         stopThrust(); // หยุด thruster
         logger.info("Ship explosion started");
@@ -351,21 +352,6 @@ public class PlayerShip extends Character {
         logger.debug("Invulnerability started");
     }
 
-    public void activateShield() {
-        if (isAlive && !isExploding) {
-            isInvulnerable = true;
-            shieldSprite.setVisible(true);
-
-            Timeline shieldTimer = new Timeline(
-                    new KeyFrame(Duration.seconds(5), e -> {
-                        isInvulnerable = false;
-                        shieldSprite.setVisible(false);
-                    })
-            );
-            shieldTimer.play();
-            logger.debug("Shield activated");
-        }
-    }
 
     public void reset() {
         lives = 3;
