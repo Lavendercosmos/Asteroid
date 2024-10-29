@@ -274,10 +274,21 @@ public class PlayerShip extends Character {
         return null;
     }
 
+    public se233.asteroid.model.SpecialAttack Specialshoot(){
+        if (!isExploding && isAlive) {
+            double radians = Math.toRadians(rotation - 90);
+            Point2D direction = new Point2D(Math.cos(radians), Math.sin(radians));
+            Point2D bulletPosition = position.add(direction.multiply(sprite.getBoundsInLocal().getWidth() / 2));
+            logger.info("Shooting SpecialBullet from position: {}", bulletPosition);
+            return new se233.asteroid.model.SpecialAttack(bulletPosition, direction, false);
+        }
+        return null;
+    }
+
     public void hit() {
         if (!isInvulnerable && !isExploding && isAlive) {//เปิดอมตะ
             lives--;
-               //explode();
+            //explode();
             logger.info("Ship hit! Lives remaining: {}", lives);
 
             if (lives <= 0) {
@@ -305,9 +316,9 @@ public class PlayerShip extends Character {
 
 //        explosionAnimation.play();
 //        explosionAnimation.setOnFinished(e -> {
-            sprite.setVisible(false);  // ซ่อน sprite
-            sprite.setImage(null);     // ลบรูปภาพ
-            isAlive = false;           // ตั้งค่าว่าตายแล้ว
+        sprite.setVisible(false);  // ซ่อน sprite
+        sprite.setImage(null);     // ลบรูปภาพ
+        isAlive = false;           // ตั้งค่าว่าตายแล้ว
 //        });
 
         stopThrust(); // หยุด thruster

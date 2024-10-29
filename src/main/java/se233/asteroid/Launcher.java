@@ -89,6 +89,13 @@ public class Launcher extends Application {
                     Stage stage = (Stage) scene.getWindow();
                     stage.setFullScreen(!stage.isFullScreen());
                     break;
+
+                    case F:
+                        if (gameView.isGameStarted() && !gameView.isPaused()) {
+                            gameView.Specialshoot();
+                            logger.debug("Spacial shoot action triggered");
+                        }
+                        break;
             }
         });
 

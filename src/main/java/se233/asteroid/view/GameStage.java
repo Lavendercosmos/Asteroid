@@ -41,6 +41,9 @@ public class GameStage extends Pane {
     private static final String STYLE_NORMAL = "-fx-font-family: Arial; -fx-font-size: 24px; -fx-fill: white;";
     private static final double MIN_SCALE = 0.5;
     private static final double MAX_SCALE = 2.0;
+    // Add these fields
+    private Text missileCountText;
+    private Text cooldownText;
 
     // Layers
     private ImageView backgroundView;
@@ -211,6 +214,7 @@ public class GameStage extends Pane {
 
     public void setupUI() {
         setupHUD();
+        setupMissileUI();
         setupStartMenu();
         setupPauseMenu();
         setupGameOverScreen();
@@ -231,6 +235,45 @@ public class GameStage extends Pane {
         if (scoreText != null) {
             scoreText.toFront();
         }
+    }
+
+    // Add method for updating missile count
+    public void updateMissileCount(int current, int max) {
+        Platform.runLater(() -> {
+            missileCountText.setText(String.format("Missiles: %d/%d", current, max));
+        });
+    }
+
+    // Add method for updating cooldown display
+    public void updateMissileCooldown(double remainingTime) {
+        Platform.runLater(() -> {
+            if (remainingTime > 0) {
+                cooldownText.setText(String.format("Cooldown: %.1fs", remainingTime));
+                cooldownText.setVisible(true);
+            } else {
+                cooldownText.setVisible(false);
+            }
+        });
+    }
+
+    private void setupMissileUI() {
+        // Setup missile count display
+        missileCountText = new Text("Missiles: 0/10");
+        missileCountText.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+        missileCountText.setFill(Color.WHITE);
+        missileCountText.setX(20);
+        missileCountText.setY(90); // Position below lives counter
+
+        // Setup cooldown display
+        cooldownText = new Text();
+        cooldownText.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+        cooldownText.setFill(Color.RED);
+        cooldownText.setX(20);
+        cooldownText.setY(110); // Position below missile count
+        cooldownText.setVisible(false);
+
+        // Add to UI layer
+        uiLayer.getChildren().addAll(missileCountText, cooldownText);
     }
 
 
@@ -489,6 +532,16 @@ public class GameStage extends Pane {
         gameLayer.getChildren().add(bullet.getSprite());
     }
 
+    public void  addSpecialAttack(SpecialAttack specialattack){
+        if (specialattack != null && specialattack.getSprite() != null) {
+            gameLayer.getChildren().add(specialattack.getSprite());
+            logger.debug("Added missile sprite to game layer");
+        } else {
+            logger.error("Cannot add null missile or missile with null sprite");
+        }
+    }
+
+
     public void addEnemyBullet(EnemyBullet enemyBullet) {
         gameLayer.getChildren().add(enemyBullet.getSprite());
     }
@@ -496,6 +549,8 @@ public class GameStage extends Pane {
     public void removeBullet(Bullet bullet) {
         gameLayer.getChildren().remove(bullet.getSprite());
     }
+
+    public void removeSpecialBullet(SpecialAttack specialbullet) {gameLayer.getChildren().remove(specialbullet.getSprite());}
 
     public void removeEnemyBullet(EnemyBullet bullet) {
         gameLayer.getChildren().remove(bullet.getSprite());
@@ -1026,6 +1081,10 @@ public class GameStage extends Pane {
 
         // Clear effects
         gameLayer.setEffect(null);
+
+        // Reset missile UI
+        updateMissileCount(0, 10);
+        cooldownText.setVisible(false);
 
         logger.info("Game stage reset completed");
     }

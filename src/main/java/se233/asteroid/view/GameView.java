@@ -2,6 +2,7 @@ package se233.asteroid.view;
 
 import javafx.animation.AnimationTimer;
 import javafx.geometry.Point2D;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.Pane;
 import javafx.scene.control.Button;
 import se233.asteroid.model.*;
@@ -17,15 +18,21 @@ public class GameView extends Pane {
     private static final Logger logger = LogManager.getLogger(GameView.class);
 
     // Game constants
-    public static final double DEFAULT_WIDTH = 800;//
+    public static final double DEFAULT_WIDTH = 800;
     public static final double DEFAULT_HEIGHT = 600;
     private static final double BORDER_MARGIN = 100;
     private static final long BULLET_COOLDOWN = 250_000_000L; // 250ms
+    private static final long BEAM_COOLDOWN = 500_000_000L;
     private static final int INITIAL_ENEMIES = 2;
     private static final double ENEMY_SPAWN_CHANCE = 0.01; // 1% chance per frame
     private static final int MAX_ENEMIES = 3;
     private static final int POINTS_REGULAR_ENEMY = 100;
     private static final int POINTS_SECOND_TIER_ENEMY = 250;
+    private int currentMissileCount = 0;
+    private double missileTimer = 0.0;
+    private boolean missileCooldown = false;
+    private static final double MISSILE_COOLDOWN = 10.0; // 10 seconds cooldown
+    private static final int MAX_MISSILES = 10;
 
     // Add to GameView.java class constants
     private static final double BOSS_SPAWN_INTERVAL = 5.0; // Spawn check every 5 seconds
@@ -35,6 +42,7 @@ public class GameView extends Pane {
     // Game components
     private final GameStage gameStage;
     private final List<Character> gameObjects;
+    private final List<SpecialAttack> SpecialBullet;
     private final List<Bullet> bullets;
     private final List<Enemy> enemies;
     private final List<EnemyBullet> enemybullets;
@@ -58,6 +66,7 @@ public class GameView extends Pane {
         this.enemybullets = new ArrayList<>();
         this.enemies = new CopyOnWriteArrayList<>();
         this.random = new Random();
+        this.SpecialBullet = new ArrayList<>();
 
         // Setup stage and size
         this.gameStage = new GameStage();
@@ -104,11 +113,54 @@ public class GameView extends Pane {
         gameLoop.start();
     }
 
+    public void addSpecialAttack(SpecialAttack missile) {
+        try {
+            if (missile == null) {
+                logger.error("Attempted to add null missile");
+                return;
+            }
+
+            ImageView sprite = missile.getSprite();
+            if (sprite == null) {
+                logger.error("Missile sprite is null");
+                return;
+            }
+
+            // Ensure sprite is visible
+            sprite.setVisible(true);
+
+            // Add to game layer with position verification
+            gameStage.getGameLayer().getChildren().add(sprite);
+
+            // Verify position
+            logger.debug("Added missile to game layer at position: {}, sprite visible: {}",
+                    missile.getPosition(), sprite.isVisible());
+
+        } catch (Exception e) {
+            logger.error("Failed to add missile to game layer", e);
+        }
+    }
+
     private void updateGame(double deltaTime) {
         // Update player
         if (player != null && player.isAlive()) {
             player.update();
             wrapAround(player);
+        }
+
+        // อัพเดท missile cooldown
+        if (missileCooldown) {
+            missileTimer += deltaTime;
+            gameStage.updateMissileCooldown(MISSILE_COOLDOWN - missileTimer);
+
+            if (missileTimer >= MISSILE_COOLDOWN) {
+                // รีเซ็ตระบบเมื่อครบเวลา cooldown
+                missileCooldown = false;
+                currentMissileCount = 0;
+                missileTimer = 0;
+                gameStage.updateMissileCount(currentMissileCount, MAX_MISSILES);
+                logger.debug("Missile system ready - Cooldown completed");
+            }
         }
 
         // Update boss
@@ -208,6 +260,31 @@ public class GameView extends Pane {
         }
 
 
+        //update SpecialAttack
+        Iterator<SpecialAttack> specialBulletIter = SpecialBullet.iterator();
+        while (specialBulletIter.hasNext()) {
+            SpecialAttack missile = specialBulletIter.next();
+            if (missile != null && missile.isActive()) {
+                missile.update();
+
+                // Debug position updates
+                logger.debug("Missile position updated to: {}", missile.getPosition());
+
+                if (isOffScreen(missile.getPosition()) || missile.isExpired()) {
+                    gameStage.removeSpecialBullet(missile);
+                    specialBulletIter.remove();
+                    logger.debug("Removed expired/offscreen missile");
+                }
+            } else {
+                if (missile == null) {
+                    logger.warn("Null missile found in SpecialBullet list");
+                } else {
+                    logger.debug("Removing inactive missile");
+                }
+                gameStage.removeSpecialBullet(missile);
+                specialBulletIter.remove();
+            }
+        }
 
         // Update other game objects
         for (Character obj : gameObjects) {
@@ -215,6 +292,15 @@ public class GameView extends Pane {
                 obj.update();
                 wrapAround(obj);
             }
+        }
+            if (missileCooldown) {
+                missileTimer += deltaTime;
+                if (missileTimer >= MISSILE_COOLDOWN) {
+                    missileTimer = 0;
+                    missileCooldown = false;
+                    currentMissileCount = 0; // Reset missile count after cooldown
+                    logger.debug("Missile system ready - Cooldown completed");
+                }
         }
     }
 
@@ -286,6 +372,64 @@ public class GameView extends Pane {
             }
         }
 
+        // Check SpacialAttack collisions
+        Iterator<SpecialAttack> specialBulletIter = new CopyOnWriteArrayList<>(SpecialBullet).iterator();
+        while (specialBulletIter.hasNext()) {
+            SpecialAttack specialbullet = specialBulletIter.next();
+            boolean bulletHit = false;
+
+            if (specialbullet.isEnemyBullet()) {
+                if (!player.isInvulnerable() && specialbullet.collidesWith(player)) {
+                    handlePlayerCollision();
+                    bulletHit = true;
+                    SpecialBullet.remove(specialbullet);
+                    gameStage.removeSpecialBullet(specialbullet);
+                }
+            } else {
+                // Check boss collision first
+                if (boss != null && boss.isAlive() && specialbullet.collidesWith(boss)) {
+                    handleBossHit();
+                    bulletHit = true;
+                }
+
+                // Check enemy collisions if bullet hasn't hit boss
+                for (Enemy enemy : new ArrayList<>(enemies)) {  // Create a copy to avoid concurrent modification
+                    if (enemy.isAlive() && !enemy.isExploding() && specialbullet.collidesWith(enemy)) {
+                        logger.debug("Bullet hit enemy at position: {}", enemy.getPosition());
+                        handleEnemyHit(enemy);
+                        SpecialBullet.remove(specialbullet);
+                        gameStage.removeSpecialBullet(specialbullet);
+                        bulletHit = true;
+                        // Log score after enemy hit
+                        logger.debug("Score after enemy hit processed: {}",
+                                gameStage.getScoreSystem().getCurrentScore());
+                        break;
+                    }
+                }
+            }
+            if (bulletHit) {
+                SpecialBullet.remove(specialbullet);
+                gameStage.removeSpecialBullet(specialbullet);
+
+                continue;
+            }
+            // Check asteroid collisions if bullet hasn't hit anything yet
+            if (!bulletHit) {
+                for (Character obj : new ArrayList<>(gameObjects)) {  // Create a copy to avoid concurrent modification
+                    if (obj instanceof Asteroid && obj.isAlive() && !((Asteroid) obj).isExploding() && specialbullet.collidesWith(obj)) {
+                        handleAsteroidHit((Asteroid) obj);
+                        bulletHit = true;
+                        bullets.remove(specialbullet);
+                        gameStage.removeSpecialBullet(specialbullet);
+                        logger.debug("Bullet hit asteroid of type: {}", ((Asteroid) obj).getType());
+                        break;
+                    }
+
+                }
+            }
+        }
+
+
         for (EnemyBullet enemyBullet : enemybullets) {
             if (enemyBullet.isAlive()  && player.collidesWith(enemyBullet)) {
                 handlePlayerCollision();
@@ -316,6 +460,7 @@ public class GameView extends Pane {
 
         // Remove inactive bullets
         bullets.removeIf(bullet -> !bullet.isAlive());
+        SpecialBullet.removeIf(specialBullet -> !specialBullet.isAlive());
     }
 
 
@@ -575,6 +720,11 @@ public class GameView extends Pane {
         }
         bullets.clear();
 
+        for (SpecialAttack specialbullet : new ArrayList<>(SpecialBullet)) {
+            gameStage.removeSpecialBullet(specialbullet);
+        }
+        SpecialBullet.clear();
+
         if (currentWave == 5) {
             spawnBoss();
         } else if (currentWave > 5) {
@@ -701,6 +851,7 @@ public class GameView extends Pane {
         // Existing clear code...
         gameObjects.clear();
         bullets.clear();
+        SpecialBullet.clear();
         enemies.clear();
         enemybullets.clear();
         if (boss != null) {
@@ -722,6 +873,14 @@ public class GameView extends Pane {
         gameStage.showGameOver(gameStage.getScoreSystem().getCurrentScore());
     }
 
+    // เพิ่มเมธอดสำหรับเริ่ม cooldown
+    private void startMissileCooldown() {
+        missileCooldown = true;
+        missileTimer = 0;
+        logger.debug("Maximum missiles reached - Starting {} second cooldown", MISSILE_COOLDOWN);
+        gameStage.updateMissileCooldown(MISSILE_COOLDOWN);
+    }
+
     // Movement controls
     public void shoot() {
         if (isGameStarted && !isPaused && player != null && player.isAlive()) {
@@ -732,6 +891,39 @@ public class GameView extends Pane {
                     bullets.add(bullet);
                     gameStage.addBullet(bullet);
                     lastBulletTime = currentTime;
+                }
+            }
+
+                }
+            }
+    public void Specialshoot() {
+        if (isGameStarted && !isPaused && player != null && player.isAlive()) {
+            // ตรวจสอบว่าอยู่ในช่วง cooldown หรือไม่
+            if (missileCooldown) {
+                double remainingCooldown = MISSILE_COOLDOWN - missileTimer;
+                gameStage.updateMissileCooldown(remainingCooldown);
+                logger.debug("Missile system cooling down. {:.1f} seconds remaining", remainingCooldown);
+                return;
+            }
+
+            // ตรวจสอบว่ายังไม่ถึงจำนวนสูงสุด
+            if (currentMissileCount < MAX_MISSILES) {
+                SpecialAttack specialattack = player.Specialshoot();
+                if (specialattack != null) {
+                    logger.debug("Creating new special attack at position: {}", specialattack.getPosition());
+                    SpecialBullet.add(specialattack);
+                    gameStage.addSpecialAttack(specialattack);
+
+                    // เพิ่มจำนวนกระสุนที่ยิงไป
+                    currentMissileCount++;
+                    gameStage.updateMissileCount(currentMissileCount, MAX_MISSILES);
+                    logger.debug("Missile count: {}/{}", currentMissileCount, MAX_MISSILES);
+
+                    // ถ้ายิงครบจำนวนแล้ว เริ่ม cooldown
+                    if (currentMissileCount >= MAX_MISSILES) {
+                        startMissileCooldown();
+
+                    }
                 }
             }
         }
