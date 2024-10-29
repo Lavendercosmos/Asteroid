@@ -22,10 +22,8 @@ public class GameView extends Pane {
     private static final double BORDER_MARGIN = 100;
     private static final long BULLET_COOLDOWN = 250_000_000L; // 250ms
     private static final int INITIAL_ENEMIES = 2;
-//    private static final double ENEMY_SPAWN_CHANCE = 0.01; // 1% chance per frame
-//    private static final int MAX_ENEMIES = 3;
-    private static final int POINTS_REGULAR_ENEMY = 100;
-    private static final int POINTS_SECOND_TIER_ENEMY = 250;
+    private static final double ENEMY_SPAWN_CHANCE = 0.01; // 1% chance per frame
+    private static final int MAX_ENEMIES = 3;
 
     // Game components
     private final GameStage gameStage;
@@ -41,7 +39,6 @@ public class GameView extends Pane {
     private double currentWidth;
     private double currentHeight;
     private int currentWave;
-    private int currentScore;
     private long lastBulletTime;
     private long lastUpdateTime;
     private final Random random;
@@ -63,7 +60,6 @@ public class GameView extends Pane {
         this.isGameStarted = false;
         this.isPaused = false;
         this.currentWave = 1;
-        this.currentScore = 0;
         this.lastUpdateTime = System.nanoTime();
 
         setupButtonHandlers();
@@ -91,7 +87,7 @@ public class GameView extends Pane {
                     updateGame(deltaTime);
                     checkCollisions();
                     checkWaveCompletion();
-//                    spawnNewEnemies();
+                    spawnNewEnemies();
                 }
             }
         };
@@ -115,18 +111,21 @@ public class GameView extends Pane {
         for (Enemy enemy : enemies) {
             if (enemy.isAlive()) {
                 enemy.update();
-                enemy.updateAI(player.getPosition());
-                wrapAround(enemy);
 
-                // Enemy shooting logic
-                if (enemy.isInShootingRange(player.getPosition()) &&
-                        enemy.getShootingCooldown() <= 0) {
+                // ส่งตำแหน่งผู้เล่นให้ AI
+                if (player != null && player.isAlive()) {
+                    enemy.updateAI(player.getPosition());
+
+                // Enemy shooting logic - แก้ไขส่วนนี้
+                if (enemy.isInShootingRange(player.getPosition()) && enemy.getShootingCooldown() <= 0) {
                     Bullet bullet = enemy.shoot(player.getPosition());
                     if (bullet != null) {
                         bullets.add(bullet);
                         gameStage.addBullet(bullet);
-                    }
+                        logger.debug("Enemy fired bullet at player from position: {}", enemy.getPosition());
+                    }}
                 }
+                wrapAround(enemy);
             }
         }
 
@@ -134,11 +133,18 @@ public class GameView extends Pane {
         Iterator<Bullet> bulletIter = bullets.iterator();
         while (bulletIter.hasNext()) {
             Bullet bullet = bulletIter.next();
-            bullet.update();
-            if (isOffScreen(bullet.getPosition())) {
+            if (bullet.isActive()) {
+                bullet.update();
+
+            // Remove bullets that are offscreen or expired
+            if (isOffScreen(bullet.getPosition()) || bullet.isExpired()) {
                 gameStage.removeBullet(bullet);
                 bulletIter.remove();
+                logger.debug("Removed bullet: {}", bullet);
             }
+            }else {
+                gameStage.removeBullet(bullet);
+                bulletIter.remove();}
         }
 
         // Update other game objects
@@ -154,51 +160,64 @@ public class GameView extends Pane {
         if (player == null || !player.isAlive() || player.isInvulnerable()) return;
 
         // Check bullet collisions
-        Iterator<Bullet> bulletIter = bullets.iterator();
+        Iterator<Bullet> bulletIter = new CopyOnWriteArrayList<>(bullets).iterator();
         while (bulletIter.hasNext()) {
             Bullet bullet = bulletIter.next();
             boolean bulletHit = false;
 
             // Skip enemy bullets hitting enemies
             if (bullet.isEnemyBullet()) {
-                // Check if enemy bullet hits player
-                if (bullet.collidesWith(player)) {
+                // เช็คว่ากระสุนศัตรูชนผู้เล่นหรือไม่
+                if (!player.isInvulnerable() && bullet.collidesWith(player)) {
                     handlePlayerCollision();
                     bulletHit = true;
+                    bullets.remove(bullet);
+                    // ลบกระสุนที่ชนแล้ว
+                    gameStage.removeBullet(bullet);
+
                 }
             } else {
                 // Check boss collision first
                 if (boss != null && boss.isAlive() && bullet.collidesWith(boss)) {
                     handleBossHit();
-                    bullet.setActive(false);
-                    gameStage.removeBullet(bullet);
-                    bulletIter.remove();
                     bulletHit = true;
                 }
 
                 // Check enemy collisions if bullet hasn't hit boss
-                if (!bulletHit) {
-                    for (Enemy enemy : enemies) {
-                        if (enemy.isAlive() && !enemy.isExploding() && bullet.collidesWith(enemy)) {
-                            handleEnemyHit(enemy);
-                            bullet.setActive(false);
-                            gameStage.removeBullet(bullet);
-                            bulletIter.remove();
-                            bulletHit = true;
-                            break;
-                        }
+                for (Enemy enemy : new ArrayList<>(enemies)) {  // Create a copy to avoid concurrent modification
+                    if (enemy.isAlive() && !enemy.isExploding() && bullet.collidesWith(enemy)) {
+                        logger.debug("Bullet hit enemy at position: {}", enemy.getPosition());
+                        handleEnemyHit(enemy);
+                        bullet.setActive(false);
+                        bullets.remove(bullet);
+                        gameStage.removeBullet(bullet);
+                        bulletHit = true;
+
+                        // Log score after enemy hit
+                        logger.debug("Score after enemy hit processed: {}",
+                                gameStage.getScoreSystem().getCurrentScore());
+                        break;
+
                     }
+                }
+                if (bulletHit) {
+                    bullets.remove(bullet);  // ใช้ bullets.remove แทน bulletIter.remove/
+                    // / ลบกระสุนที่ชนแล้ว
+                    gameStage.removeBullet(bullet);
+
+                    continue;
                 }
             }
 
             // Check asteroid collisions if bullet hasn't hit anything yet
             if (!bulletHit) {
-                for (Character obj : gameObjects) {
-                    if (obj instanceof Asteroid && obj.isAlive() && bullet.collidesWith(obj)) {
+                for (Character obj : new ArrayList<>(gameObjects)) {  // Create a copy to avoid concurrent modification
+                    if (obj instanceof Asteroid && obj.isAlive() && !((Asteroid)obj).isExploding() && bullet.collidesWith(obj)) {
                         handleAsteroidHit((Asteroid)obj);
-                        bullet.setActive(false);
+                        bulletHit = true;
+                        bullets.remove(bullet);
                         gameStage.removeBullet(bullet);
-                        bulletIter.remove();
+                        logger.debug("Bullet hit asteroid of type: {}", ((Asteroid)obj).getType());
                         break;
                     }
                 }
@@ -232,49 +251,83 @@ public class GameView extends Pane {
 
 
     private void handleAsteroidHit(Asteroid asteroid) {
+        if (!asteroid.isAlive()) {
+            return; // Skip if asteroid is already destroyed
+        }
+
+        // Call hit() on the asteroid
         asteroid.hit();
         gameStage.showExplosion(asteroid.getPosition());
 
+        // Add points based on asteroid type before creating fragments
+        if (asteroid.getType() == Asteroid.Type.ASTEROID) {
+            gameStage.getScoreSystem().addAsteroidPoints();
+            logger.info("Added points for destroying ASTEROID");
+        } else if (asteroid.getType() == Asteroid.Type.METEOR) {
+            gameStage.getScoreSystem().addMeteorPoints();
+            logger.info("Added points for destroying METEOR");
+        }
+
+        // Only create fragments and remove if asteroid is destroyed
         if (!asteroid.isAlive()) {
-            // สร้าง fragments เมื่ออุกาบาตถูกทำลาย
-            for (Asteroid fragment : asteroid.split()) {
-                addGameObject(fragment);
+            // Create fragments if it's an asteroid
+            if (asteroid.getType() == Asteroid.Type.ASTEROID) {
+                for (Asteroid fragment : asteroid.split()) {
+                    addGameObject(fragment);
+                }
+                logger.debug("Created fragments for destroyed asteroid");
             }
-            increaseScore(100); // คะแนนคงที่สำหรับการทำลายอุกาบาต
+
+            // Remove the destroyed asteroid from game objects
+            gameObjects.remove(asteroid);
+            gameStage.removeGameObject(asteroid);
+            logger.debug("Removed destroyed {} from game", asteroid.getType());
         }
     }
 
     private void handleEnemyHit(Enemy enemy) {
+        if (!enemy.isAlive() || enemy.isExploding()) {
+            return; // Skip if enemy is already dead or exploding
+        }
+
+        // Log current score before adding points
+        logger.debug("Current score before enemy hit: {}", gameStage.getScoreSystem().getCurrentScore());
+
+        // Call hit() on enemy and show explosion
         enemy.hit();
         gameStage.showExplosion(enemy.getPosition());
 
+        // Add points immediately when hit, don't wait for explosion to finish
+        if (enemy.isSecondTier()) {
+            logger.info("Adding points for second tier enemy");
+            gameStage.getScoreSystem().addSecondTierEnemyPoints();
+        } else {
+            logger.info("Adding points for regular enemy");
+            gameStage.getScoreSystem().addRegularEnemyPoints();
+        }
+
+        // Log score after adding points
+        logger.debug("Current score after enemy hit: {}", gameStage.getScoreSystem().getCurrentScore());
+
+        // Remove enemy from game if dead
         if (!enemy.isAlive()) {
-            gameStage.removeGameObject(enemy); // ลบออกจาก GameStage ก่อน
-            enemies.remove(enemy);             // จากนั้นลบออกจาก enemies list
-
-            int points = enemy.isSecondTier() ? POINTS_SECOND_TIER_ENEMY : POINTS_REGULAR_ENEMY;
-            increaseScore(points);
-            gameStage.showScorePopup(points, enemy.getPosition());
-
-            logger.info("Enemy destroyed! Points awarded: {}, Remaining enemies: {}",
-                    points, enemies.size());
+            enemies.remove(enemy);
+            gameStage.removeGameObject(enemy);
+            logger.info("Enemy destroyed! Type: {}, Remaining enemies: {}",
+                    enemy.isSecondTier() ? "Second Tier" : "Regular",
+                    enemies.size());
         }
     }
 
-//    private void spawnNewEnemies() {
-//        // Only spawn new enemies in waves 2-4
-//        if (currentWave >= 2 && currentWave <= 4) {
-//            if (enemies.size() < MAX_ENEMIES && random.nextDouble() < ENEMY_SPAWN_CHANCE) {
-//                spawnEnemy();
-//                logger.debug("Spawned new enemy. Total enemies: {}", enemies.size());
-//            }
-//        }
-//    }
-//
-//    private boolean isWaveNearCompletion() {
-//        // เช็คว่าใกล้จบ wave หรือยัง (เช่น เหลือ enemies น้อยกว่า 2 ตัว)
-//        return enemies.size() <= 2;
-//    }
+    private void spawnNewEnemies() {
+        // Only spawn new enemies in waves 2-4
+        if (currentWave >= 2 && currentWave <= 4) {
+            if (enemies.size() < MAX_ENEMIES && random.nextDouble() < ENEMY_SPAWN_CHANCE) {
+                spawnEnemy();
+                logger.debug("Spawned new enemy. Total enemies: {}", enemies.size());
+            }
+        }
+    }
 
 
     private void spawnEnemy() {
@@ -300,26 +353,10 @@ public class GameView extends Pane {
     private void spawnInitialEnemies() {
         // Only spawn enemies if we're in wave 2 or higher
         if (currentWave >= 2) {
-            // ปรับจำนวน enemies ตามแต่ละ wave
-            int spawnCount;
-            switch (currentWave) {
-                case 2:
-                    spawnCount = 2; // regular enemies only
-                    break;
-                case 3:
-                    spawnCount = 3; // second-tier enemies only
-                    break;
-                case 4:
-                    spawnCount = 4; // mixed enemies
-                    break;
-                default:
-                    spawnCount = INITIAL_ENEMIES;
-            }
-
-            for (int i = 0; i < spawnCount; i++) {
+            for (int i = 0; i < INITIAL_ENEMIES; i++) {
                 spawnEnemy();
             }
-            logger.info("Spawned {} enemies for wave {}", spawnCount, currentWave);
+            logger.info("Spawned {} initial enemies for wave {}", INITIAL_ENEMIES, currentWave);
         }
     }
 
@@ -331,7 +368,7 @@ public class GameView extends Pane {
         if (!boss.isAlive()) {
             gameStage.showExplosion(boss.getPosition());
             gameStage.hideBossHealth(); // Hide health bar when boss dies
-            increaseScore(5000);
+            gameStage.getScoreSystem().addBossPoints();
             startNextWave();
         }
     }
@@ -455,7 +492,6 @@ public class GameView extends Pane {
             gameStage.removeGameObject(enemy);
         }
         enemies.clear();
-
         // Clear asteroids
         List<Character> asteroidsToRemove = gameObjects.stream()
                 .filter(obj -> obj instanceof Asteroid)
@@ -478,6 +514,7 @@ public class GameView extends Pane {
             endGame();
         } else {
             spawnAsteroids();
+            // Ensure enemies are spawned immediately for waves 2-4
             if (currentWave >= 2) {
                 spawnInitialEnemies();
                 logger.info("Initial enemies spawned for wave {}: {}",
@@ -504,17 +541,6 @@ public class GameView extends Pane {
         // Initialize boss health bar
         gameStage.updateBossHealth(1.0, false); // Start with full health
     }
-
-//    private void spawnAsteroid() {
-//        double x = Math.random() * DEFAULT_WIDTH;
-//        double y = Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50;
-//        Point2D spawnPos = new Point2D(x, y);
-//
-//        // Create an asteroid
-//        Asteroid asteroid = new Asteroid(spawnPos, Asteroid.Type.ASTEROID);
-//        addGameObject(asteroid);
-//    }
-
 
     private void spawnAsteroids() {
         if (currentWave == 1) {
@@ -564,11 +590,6 @@ public class GameView extends Pane {
         }
     }
 
-    private void increaseScore(int points) {
-        currentScore += points;
-        gameStage.updateScore(currentScore);
-    }
-
     // Public control methods
     public void startGame() {
         if (!isGameStarted) {
@@ -584,9 +605,8 @@ public class GameView extends Pane {
             spawnInitialEnemies();
 
             // Reset score and wave
-            currentScore = 0;
             currentWave = 1;
-            gameStage.updateScore(currentScore);
+            gameStage.getScoreSystem().reset();
             gameStage.updateWave(currentWave);
 
             logger.info("Game started");
@@ -623,14 +643,13 @@ public class GameView extends Pane {
         isGameStarted = false;
         isPaused = false;
         currentWave = 1;
-        currentScore = 0;
         gameStage.reset();
         logger.info("Game reset");
     }
 
     private void endGame() {
         isGameStarted = false;
-        gameStage.showGameOver(currentScore);
+        gameStage.showGameOver(gameStage.getScoreSystem().getCurrentScore());
     }
 
     // Movement controls
@@ -660,8 +679,6 @@ public class GameView extends Pane {
     // Getters
     public boolean isGameStarted() { return isGameStarted; }
     public boolean isPaused() { return isPaused; }
-    public int getCurrentWave() { return currentWave; }
-    public int getScore() { return currentScore; }
     public Button getStartButton() { return gameStage.getStartButton(); }
     public Button getRestartButton() { return gameStage.getRestartButton(); }
     public Button getResumeButton() { return gameStage.getResumeButton(); }
