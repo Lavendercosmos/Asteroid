@@ -10,6 +10,7 @@ import org.apache.logging.log4j.Logger;
 import se233.asteroid.model.Character;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class GameView extends Pane {
@@ -18,10 +19,11 @@ public class GameView extends Pane {
     // Game constants
     public static final double DEFAULT_WIDTH = 800;
     public static final double DEFAULT_HEIGHT = 600;
+    private static final double BORDER_MARGIN = 100;
     private static final long BULLET_COOLDOWN = 250_000_000L; // 250ms
     private static final int INITIAL_ENEMIES = 2;
-    private static final double ENEMY_SPAWN_CHANCE = 0.01; // 1% chance per frame
-    private static final int MAX_ENEMIES = 3;
+//    private static final double ENEMY_SPAWN_CHANCE = 0.01; // 1% chance per frame
+//    private static final int MAX_ENEMIES = 3;
     private static final int POINTS_REGULAR_ENEMY = 100;
     private static final int POINTS_SECOND_TIER_ENEMY = 250;
 
@@ -89,7 +91,7 @@ public class GameView extends Pane {
                     updateGame(deltaTime);
                     checkCollisions();
                     checkWaveCompletion();
-                    spawnNewEnemies();
+//                    spawnNewEnemies();
                 }
             }
         };
@@ -247,29 +249,32 @@ public class GameView extends Pane {
         gameStage.showExplosion(enemy.getPosition());
 
         if (!enemy.isAlive()) {
-            // ใช้ remove ที่ปลอดภัยกว่าด้วย CopyOnWriteArrayList
-            enemies.remove(enemy);
+            gameStage.removeGameObject(enemy); // ลบออกจาก GameStage ก่อน
+            enemies.remove(enemy);             // จากนั้นลบออกจาก enemies list
+
             int points = enemy.isSecondTier() ? POINTS_SECOND_TIER_ENEMY : POINTS_REGULAR_ENEMY;
             increaseScore(points);
             gameStage.showScorePopup(points, enemy.getPosition());
 
-            // เพิ่ม log เพื่อตรวจสอบ
             logger.info("Enemy destroyed! Points awarded: {}, Remaining enemies: {}",
                     points, enemies.size());
-
-
         }
     }
 
-    private void spawnNewEnemies() {
-        // Only spawn new enemies in waves 2-4
-        if (currentWave >= 2 && currentWave <= 4) {
-            if (enemies.size() < MAX_ENEMIES && random.nextDouble() < ENEMY_SPAWN_CHANCE) {
-                spawnEnemy();
-                logger.debug("Spawned new enemy. Total enemies: {}", enemies.size());
-            }
-        }
-    }
+//    private void spawnNewEnemies() {
+//        // Only spawn new enemies in waves 2-4
+//        if (currentWave >= 2 && currentWave <= 4) {
+//            if (enemies.size() < MAX_ENEMIES && random.nextDouble() < ENEMY_SPAWN_CHANCE) {
+//                spawnEnemy();
+//                logger.debug("Spawned new enemy. Total enemies: {}", enemies.size());
+//            }
+//        }
+//    }
+//
+//    private boolean isWaveNearCompletion() {
+//        // เช็คว่าใกล้จบ wave หรือยัง (เช่น เหลือ enemies น้อยกว่า 2 ตัว)
+//        return enemies.size() <= 2;
+//    }
 
 
     private void spawnEnemy() {
@@ -295,10 +300,26 @@ public class GameView extends Pane {
     private void spawnInitialEnemies() {
         // Only spawn enemies if we're in wave 2 or higher
         if (currentWave >= 2) {
-            for (int i = 0; i < INITIAL_ENEMIES; i++) {
+            // ปรับจำนวน enemies ตามแต่ละ wave
+            int spawnCount;
+            switch (currentWave) {
+                case 2:
+                    spawnCount = 2; // regular enemies only
+                    break;
+                case 3:
+                    spawnCount = 3; // second-tier enemies only
+                    break;
+                case 4:
+                    spawnCount = 4; // mixed enemies
+                    break;
+                default:
+                    spawnCount = INITIAL_ENEMIES;
+            }
+
+            for (int i = 0; i < spawnCount; i++) {
                 spawnEnemy();
             }
-            logger.info("Spawned {} initial enemies for wave {}", INITIAL_ENEMIES, currentWave);
+            logger.info("Spawned {} enemies for wave {}", spawnCount, currentWave);
         }
     }
 
@@ -429,9 +450,27 @@ public class GameView extends Pane {
         logger.info("Starting Wave {}", currentWave);
         gameStage.updateWave(currentWave);
 
-        // เคลียร์ enemies และ asteroids จากรอบก่อนหน้า
+        // Clear enemies
+        for (Enemy enemy : new ArrayList<>(enemies)) {
+            gameStage.removeGameObject(enemy);
+        }
         enemies.clear();
-        gameObjects.removeIf(obj -> obj instanceof Asteroid);
+
+        // Clear asteroids
+        List<Character> asteroidsToRemove = gameObjects.stream()
+                .filter(obj -> obj instanceof Asteroid)
+                .collect(Collectors.toList());
+
+        for (Character asteroid : asteroidsToRemove) {
+            gameStage.removeGameObject(asteroid);
+            gameObjects.remove(asteroid);
+        }
+
+        // Clear bullets
+        for (Bullet bullet : new ArrayList<>(bullets)) {
+            gameStage.removeBullet(bullet);
+        }
+        bullets.clear();
 
         if (currentWave == 5) {
             spawnBoss();
@@ -439,7 +478,6 @@ public class GameView extends Pane {
             endGame();
         } else {
             spawnAsteroids();
-            // Ensure enemies are spawned immediately for waves 2-4
             if (currentWave >= 2) {
                 spawnInitialEnemies();
                 logger.info("Initial enemies spawned for wave {}: {}",
@@ -447,6 +485,7 @@ public class GameView extends Pane {
             }
         }
     }
+
 
     // เพิ่มเมธอดใหม่ถ้าต้องการให้เล่นต่อหลัง wave 5
     private void resetWaves() {
@@ -466,47 +505,53 @@ public class GameView extends Pane {
         gameStage.updateBossHealth(1.0, false); // Start with full health
     }
 
-    private void spawnAsteroid() {
-        double x = Math.random() * DEFAULT_WIDTH;
-        double y = Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50;
-        Point2D spawnPos = new Point2D(x, y);
-
-        // Create an asteroid
-        Asteroid asteroid = new Asteroid(spawnPos, Asteroid.Type.ASTEROID);
-        addGameObject(asteroid);
-    }
+//    private void spawnAsteroid() {
+//        double x = Math.random() * DEFAULT_WIDTH;
+//        double y = Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50;
+//        Point2D spawnPos = new Point2D(x, y);
+//
+//        // Create an asteroid
+//        Asteroid asteroid = new Asteroid(spawnPos, Asteroid.Type.ASTEROID);
+//        addGameObject(asteroid);
+//    }
 
 
     private void spawnAsteroids() {
         if (currentWave == 1) {
-            // Wave 1: 2 ASTEROID และ 2 METEOR แน่นอน
+            // Wave แรก: สร้าง ASTEROID 2 ก้อน และ METEOR 2 ก้อน
             for (int i = 0; i < 2; i++) {
-                // สร้าง ASTEROID
+                // สร้างตำแหน่งสำหรับ ASTEROID
+                // สูตร: จุดเริ่มต้น(BORDER_MARGIN) + (สุ่มตำแหน่งในพื้นที่ที่เหลือ)
                 Point2D asteroidPos = new Point2D(
-                        Math.random() * DEFAULT_WIDTH,
-                        Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50
+                        // ตำแหน่ง X = ระยะห่างจากขอบ + (สุ่มค่าในช่วงความกว้างที่เหลือ)
+                        BORDER_MARGIN + (Math.random() * (DEFAULT_WIDTH - 2 * BORDER_MARGIN)),
+                        // ตำแหน่ง Y = ระยะห่างจากขอบ + (สุ่มค่าในช่วงความสูงที่เหลือ)
+                        BORDER_MARGIN + (Math.random() * (DEFAULT_HEIGHT - 2 * BORDER_MARGIN))
                 );
+                // สร้าง ASTEROID ในตำแหน่งที่กำหนด
                 Asteroid asteroid = new Asteroid(asteroidPos, Asteroid.Type.ASTEROID);
                 addGameObject(asteroid);
 
-                // สร้าง METEOR
+                // สร้างตำแหน่งสำหรับ METEOR (ใช้วิธีเดียวกัน)
                 Point2D meteorPos = new Point2D(
-                        Math.random() * DEFAULT_WIDTH,
-                        Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50
+                        BORDER_MARGIN + (Math.random() * (DEFAULT_WIDTH - 2 * BORDER_MARGIN)),
+                        BORDER_MARGIN + (Math.random() * (DEFAULT_HEIGHT - 2 * BORDER_MARGIN))
                 );
+                // สร้าง METEOR ในตำแหน่งที่กำหนด
                 Asteroid meteor = new Asteroid(meteorPos, Asteroid.Type.METEOR);
                 addGameObject(meteor);
             }
-            logger.info("Wave 1: Spawned 2 asteroids and 2 meteors");
+            logger.info("Wave 1: สร้าง asteroid 2 ก้อน และ meteor 2 ก้อน ห่างจากขอบจอ");
         } else {
-            // Wave 2-5: สุ่มเกิด 5 อุกาบาตจาก ASTEROID และ METEOR
+            // Wave 2-5: สร้างสิ่งกีดขวางแบบสุ่ม 5 ชิ้น
             for (int i = 0; i < 5; i++) {
+                // สร้างตำแหน่งที่ห่างจากขอบ
                 Point2D spawnPos = new Point2D(
-                        Math.random() * DEFAULT_WIDTH,
-                        Math.random() < 0.5 ? -50 : DEFAULT_HEIGHT + 50
+                        BORDER_MARGIN + (Math.random() * (DEFAULT_WIDTH - 2 * BORDER_MARGIN)),
+                        BORDER_MARGIN + (Math.random() * (DEFAULT_HEIGHT - 2 * BORDER_MARGIN))
                 );
 
-                // สุ่มว่าจะเป็น ASTEROID หรือ METEOR (50-50)
+                // สุ่มประเภทของสิ่งกีดขวาง (50% ASTEROID, 50% METEOR)
                 if (Math.random() < 0.5) {
                     Asteroid asteroid = new Asteroid(spawnPos, Asteroid.Type.ASTEROID);
                     addGameObject(asteroid);
@@ -611,12 +656,6 @@ public class GameView extends Pane {
     public void rotateRight() { if (player != null) player.rotateRight(); }
     public void stopThrust() { if (player != null) player.stopThrust(); }
 
-    // Window resize handling
-    public void handleResize(double width, double height) {
-        currentWidth = width;
-        currentHeight = height;
-        gameStage.handleResize(width, height);
-    }
 
     // Getters
     public boolean isGameStarted() { return isGameStarted; }

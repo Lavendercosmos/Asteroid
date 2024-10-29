@@ -28,7 +28,7 @@ public class Boss extends Character {
     private static final Logger logger = LogManager.getLogger(Boss.class);
 
     // Constants
-    private static final int BASE_HEALTH = 200;
+    private static final int BASE_HEALTH = 100;
     private static final double BASE_SPEED = 3.0;
     private static final double BULLET_SPEED = 5.0;
     private static final double ATTACK_PATTERN_DURATION = 5.0;
@@ -37,7 +37,7 @@ public class Boss extends Character {
 
     // Sprite paths - Updated to use consistent lowercase paths
     private static final String BOSS_NORMAL_SPRITE = "/se233/asteroid/assets/Boss/Boss.png";
-    private static final String BOSS_SHOOT_SPRITE = "/se233/asteroid/assets/Boss/Boss_shot.png";  // Changed from boss_shoot.png
+    private static final String BOSS_SHOOT_SPRITE = "/se233/asteroid/assets/Boss/Boss_shot.png";
     private static final String BOSS_EXPLOSION_SPRITE = "/se233/asteroid/assets/Boss/Explosion_Boss.png";
 
     // Rest of the class remains unchanged...

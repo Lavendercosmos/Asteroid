@@ -35,6 +35,7 @@ public class GameState {
 
     // Collections for game objects
     private final List<Asteroid> asteroids = new ArrayList<>();
+    private final List<Enemy> enemies = new ArrayList<>();
     private final List<PowerUp> powerUps = new ArrayList<>();
     private Boss currentBoss;
     private PlayerShip player;
@@ -113,6 +114,7 @@ public class GameState {
 
     private void clearWaveEntities() {
         asteroids.clear();
+        enemies.clear();
         powerUps.clear();
         currentBoss = null;
     }
