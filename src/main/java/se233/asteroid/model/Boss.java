@@ -240,7 +240,7 @@ public class Boss extends Character {
     }
 
     // New method to spawn single enemy
-    private Enemy spawnSingleEnemy() {
+    public Enemy spawnSingleEnemy() {
         // Choose random spawn pattern
         SpawnPattern pattern = getRandomSpawnPattern();
         Point2D spawnPos;
