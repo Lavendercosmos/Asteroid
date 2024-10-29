@@ -4,10 +4,7 @@ import javafx.animation.AnimationTimer;
 import javafx.geometry.Point2D;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
-import se233.asteroid.model.PlayerShip;
-import se233.asteroid.model.Bullet;
-import se233.asteroid.model.Asteroid;
-import se233.asteroid.model.Boss;
+import se233.asteroid.model.*;
 import se233.asteroid.view.GameStage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -224,10 +221,18 @@ public class GameController {
             wrapPosition(asteroid);
         }
 
-        // Update boss
+        // Update boss and collect spawned enemies
         if (boss != null) {
             boss.update(deltaTime, player.getPosition());
             wrapPosition(boss);
+
+            // Collect and add spawned enemies from boss
+            List<Enemy> newEnemies = boss.collectSpawnedEnemies();
+            for (Enemy enemy : newEnemies) {
+                // Add enemy sprite to game scene
+                gameStage.addGameObject(enemy);
+                logger.info("Added new enemy spawned by boss at position: {}", enemy.getPosition());
+            }
 
             if (random.nextDouble() < 0.01) { // Boss special attack
                 Bullet[] bossAttack = boss.shootSpecialAttack();
@@ -237,12 +242,8 @@ public class GameController {
                 }
             }
         }
-
-        // Check if it's time to spawn boss
-        if (asteroids.isEmpty() && boss == null) {
-            spawnBoss();
-        }
     }
+
 
     private void checkCollisions() {
         // Check bullet collisions with asteroids
@@ -364,6 +365,11 @@ public class GameController {
         bullets.clear();
 
         if (boss != null) {
+            // Clear any remaining spawned enemies when clearing boss
+            List<Enemy> remainingEnemies = boss.collectSpawnedEnemies();
+            for (Enemy enemy : remainingEnemies) {
+                gameStage.removeGameObject(enemy);
+            }
             gameStage.removeGameObject(boss);
             boss = null;
         }
