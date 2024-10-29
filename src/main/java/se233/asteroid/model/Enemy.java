@@ -28,7 +28,7 @@ public class Enemy extends Character {
     private static final double SHOOT_ACCURACY = 0.95; // 95% accuracy, add some randomness
     private static final String BULLET_SPRITE_PATH = "/se233/asteroid/assets/Enemy/Enemy_shoot.png";
 
-    private static final double BEHAVIOR_CHANGE_CHANCE = 0.02;
+    private static final double BEHAVIOR_CHANGE_CHANCE = 0.02;//
     private static final double MIN_ACCURACY = 0.98; // ความแม่นยำขั้นต่ำ (ลดการสุ่มเบี่ยงเบน)
     private static final double TRACKING_SPEED = 2.0; // ความเร็วในการติดตามเป้าหมาย
     private static final double MOVEMENT_CHANGE_INTERVAL = 2.0; // เปลี่ยนทิศทางทุก 2 วินาที
@@ -309,8 +309,6 @@ public class Enemy extends Character {
     public double getHitRadius() {
         return isSecondTier ? SECOND_TIER_HITBOX : DEFAULT_HITBOX;
     }
-
-
 
 
     public void setVelocity(Point2D velocity) {
