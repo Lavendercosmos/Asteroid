@@ -32,8 +32,8 @@ public class Enemy extends Character {
     private static final String SECOND_TIER_ENEMY_SPRITE = "/se233/asteroid/assets/Enemy/Second-tier enemy.png";
     private static final String REGULAR_SHOOT_SPRITE = "/se233/asteroid/assets/Enemy/Enemy_shoot.png";
     private static final String SECOND_TIER_SHOOT_SPRITE = "/se233/asteroid/assets/Enemy/Second_shot.png";
-    private static final String REGULAR_EXPLOSION_SPRITE = "/se233/asteroid/assets/PlayerShip/Explosion.png";
-    private static final String SECOND_TIER_EXPLOSION_SPRITE = "/se233/asteroid/assets/PlayerShip/Explosion.png";
+    private static final String REGULAR_EXPLOSION_SPRITE = "/se233/asteroid/assets/Enemy/Enemy_Explosion.png";
+    private static final String SECOND_TIER_EXPLOSION_SPRITE = "/se233/asteroid/assets/Enemy/Explosion_second.png";
 
     // Animation constants
     private static final double SHOOTING_DURATION = 0.15; // 150ms for shooting animation

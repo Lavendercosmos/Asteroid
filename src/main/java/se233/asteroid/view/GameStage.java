@@ -24,12 +24,10 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.transform.Scale;
 import javafx.util.Duration;
-import se233.asteroid.model.Character;
-import se233.asteroid.model.Bullet;
-import se233.asteroid.model.Boss;
+import se233.asteroid.model.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import se233.asteroid.model.Score;
+import se233.asteroid.model.Character;
 
 import java.util.Objects;
 
@@ -79,6 +77,7 @@ public class GameStage extends Pane {
 
     private Group victoryGroup;
     public Pane getUiLayer() {return uiLayer;}
+    public Pane getGameLayer() {return gameLayer;}
 
     public GameStage() {
         initializeStage();
@@ -490,9 +489,18 @@ public class GameStage extends Pane {
         gameLayer.getChildren().add(bullet.getSprite());
     }
 
+    public void addEnemyBullet(EnemyBullet enemyBullet) {
+        gameLayer.getChildren().add(enemyBullet.getSprite());
+    }
+
     public void removeBullet(Bullet bullet) {
         gameLayer.getChildren().remove(bullet.getSprite());
     }
+
+    public void removeEnemyBullet(EnemyBullet bullet) {
+        gameLayer.getChildren().remove(bullet.getSprite());
+    }
+
     private void showBossWarning() {
         Text warningText = new Text("WARNING!\nBOSS APPROACHING");
         warningText.setStyle(STYLE_HEADER);
@@ -969,56 +977,56 @@ public class GameStage extends Pane {
         }
     }
 
-        // Getters and utility methods
-        public Button getStartButton () {
-            return startButton;
-        }
-        public Button getRestartButton () {
-            return restartButton;
-        }
-        public Button getResumeButton () {
-            return resumeButton;
-        }
-        public boolean isGameStarted () {
-            return isGameStarted;
-        }
-        public boolean isPaused () {
-            return isPaused;
-        }
+    // Getters and utility methods
+    public Button getStartButton () {
+        return startButton;
+    }
+    public Button getRestartButton () {
+        return restartButton;
+    }
+    public Button getResumeButton () {
+        return resumeButton;
+    }
+    public boolean isGameStarted () {
+        return isGameStarted;
+    }
+    public boolean isPaused () {
+        return isPaused;
+    }
 
-        public Button getTryAgainButton(){
-            return  TryAgainButton;
-        }
+    public Button getTryAgainButton(){
+        return  TryAgainButton;
+    }
 
-        public void reset () {
-            // Reset game state
-            isGameStarted = false;
-            isPaused = false;
-            currentWave = 1;
-            currentLives = 3;
-            resetScore();
+    public void reset () {
+        // Reset game state
+        isGameStarted = false;
+        isPaused = false;
+        currentWave = 1;
+        currentLives = 3;
+        resetScore();
 
-            // Reset UI elements
-            livesText.setText("Lives: 3");
-            waveText.setText("Wave: 1");
+        // Reset UI elements
+        livesText.setText("Lives: 3");
+        waveText.setText("Wave: 1");
 
-            // Clear all layers
-            gameLayer.getChildren().clear();
-            effectLayer.getChildren().clear();
-            particleLayer.getChildren().clear();
+        // Clear all layers
+        gameLayer.getChildren().clear();
+        effectLayer.getChildren().clear();
+        particleLayer.getChildren().clear();
 
-            // Reset background
-            setupBackground();
+        // Reset background
+        setupBackground();
 
-            // Reset menus
-            startMenuGroup.setVisible(true);
-            startMenuGroup.setOpacity(1);
-            pauseMenuGroup.setVisible(false);
-            gameOverGroup.setVisible(false);
+        // Reset menus
+        startMenuGroup.setVisible(true);
+        startMenuGroup.setOpacity(1);
+        pauseMenuGroup.setVisible(false);
+        gameOverGroup.setVisible(false);
 
-            // Clear effects
-            gameLayer.setEffect(null);
+        // Clear effects
+        gameLayer.setEffect(null);
 
-            logger.info("Game stage reset completed");
-        }
+        logger.info("Game stage reset completed");
+    }
 }
