@@ -47,7 +47,6 @@ public abstract class Character {
             updateSpritePosition();
             updateSpriteRotation();
 
-            logger.debug("Character created at position {} with hitRadius {}", position, hitRadius);
         } catch (Exception e) {
             logger.error("Failed to load sprite: " + spritePath, e);
             throw new RuntimeException("Failed to initialize character sprite: " + spritePath, e);
@@ -122,6 +121,14 @@ public abstract class Character {
     protected void updateSpriteRotation() {
         if (sprite != null) {
             sprite.setRotate(rotation);
+        }
+    }
+
+    protected void setImage(Image image) {
+        if (sprite != null && image != null) {
+            sprite.setImage(image);
+        } else {
+            logger.warn("Attempted to set null image or sprite is null");
         }
     }
 
