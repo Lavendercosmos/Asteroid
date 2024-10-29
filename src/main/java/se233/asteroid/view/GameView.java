@@ -95,6 +95,7 @@ public class GameView extends Pane {
         gameLoop.start();
     }
 
+
     private void updateGame(double deltaTime) {
         // Update player
         if (player != null && player.isAlive()) {
@@ -102,32 +103,52 @@ public class GameView extends Pane {
             wrapAround(player);
         }
 
-        // Update boss
+        // Update boss and collect spawned enemies
         if (boss != null && boss.isAlive()) {
             boss.update(deltaTime, player.getPosition());
             wrapAround(boss);
+
+            // Collect and add spawned enemies from boss
+            List<Enemy> newEnemies = boss.collectSpawnedEnemies();
+            if (!newEnemies.isEmpty()) {
+                for (Enemy enemy : newEnemies) {
+                    enemies.add(enemy);
+                    gameStage.addGameObject(enemy);
+                    logger.info("Added boss-spawned enemy: {}",
+                            enemy.isSecondTier() ? "Second Tier" : "Regular");
+                }
+            }
         }
 
-        // Update enemies
+        // Update enemies - แก้ไขวิธีการอัพเดทและลบ enemy
+        List<Enemy> deadEnemies = new ArrayList<>();
         for (Enemy enemy : enemies) {
             if (enemy.isAlive()) {
                 enemy.update();
-
-                // ส่งตำแหน่งผู้เล่นให้ AI
                 if (player != null && player.isAlive()) {
                     enemy.updateAI(player.getPosition());
 
-                // Enemy shooting logic - แก้ไขส่วนนี้
-                if (enemy.isInShootingRange(player.getPosition()) && enemy.getShootingCooldown() <= 0) {
-                    Bullet bullet = enemy.shoot(player.getPosition());
-                    if (bullet != null) {
-                        bullets.add(bullet);
-                        gameStage.addBullet(bullet);
-                        logger.debug("Enemy fired bullet at player from position: {}", enemy.getPosition());
-                    }}
+                    // Enemy shooting logic
+                    if (enemy.isInShootingRange(player.getPosition()) &&
+                            enemy.getShootingCooldown() <= 0) {
+                        Bullet bullet = enemy.shoot(player.getPosition());
+                        if (bullet != null) {
+                            bullets.add(bullet);
+                            gameStage.addBullet(bullet);
+                        }
+                    }
                 }
                 wrapAround(enemy);
+            } else {
+                deadEnemies.add(enemy);
             }
+        }
+
+        // Remove dead enemies after iteration
+        for (Enemy enemy : deadEnemies) {
+            enemies.remove(enemy);
+            gameStage.removeGameObject(enemy);
+            logger.debug("Removed dead enemy");
         }
 
         // Update bullets
@@ -136,20 +157,19 @@ public class GameView extends Pane {
             Bullet bullet = bulletIter.next();
             if (bullet.isActive()) {
                 bullet.update();
-
-            // Remove bullets that are offscreen or expired
-            if (isOffScreen(bullet.getPosition()) || bullet.isExpired()) {
+                // Remove bullets that are offscreen or expired
+                if (isOffScreen(bullet.getPosition()) || bullet.isExpired()) {
+                    gameStage.removeBullet(bullet);
+                    bulletIter.remove();
+                }
+            } else {
                 gameStage.removeBullet(bullet);
                 bulletIter.remove();
-                logger.debug("Removed bullet: {}", bullet);
             }
-            }else {
-                gameStage.removeBullet(bullet);
-                bulletIter.remove();}
         }
 
         // Update other game objects
-        for (Character obj : gameObjects) {
+        for (Character obj : new ArrayList<>(gameObjects)) {
             if (obj.isAlive()) {
                 obj.update();
                 wrapAround(obj);
@@ -288,35 +308,25 @@ public class GameView extends Pane {
 
     private void handleEnemyHit(Enemy enemy) {
         if (!enemy.isAlive() || enemy.isExploding()) {
-            return; // Skip if enemy is already dead or exploding
+            return;
         }
 
-        // Log current score before adding points
-        logger.debug("Current score before enemy hit: {}", gameStage.getScoreSystem().getCurrentScore());
-
-        // Call hit() on enemy and show explosion
         enemy.hit();
         gameStage.showExplosion(enemy.getPosition());
 
-        // Add points immediately when hit, don't wait for explosion to finish
+        // Add points
         if (enemy.isSecondTier()) {
-            logger.info("Adding points for second tier enemy");
             gameStage.getScoreSystem().addSecondTierEnemyPoints();
         } else {
-            logger.info("Adding points for regular enemy");
             gameStage.getScoreSystem().addRegularEnemyPoints();
         }
 
-        // Log score after adding points
-        logger.debug("Current score after enemy hit: {}", gameStage.getScoreSystem().getCurrentScore());
-
-        // Remove enemy from game if dead
+        // Remove enemy if dead
         if (!enemy.isAlive()) {
             enemies.remove(enemy);
             gameStage.removeGameObject(enemy);
-            logger.info("Enemy destroyed! Type: {}, Remaining enemies: {}",
-                    enemy.isSecondTier() ? "Second Tier" : "Regular",
-                    enemies.size());
+            logger.info("Enemy destroyed: {}",
+                    enemy.isSecondTier() ? "Second Tier" : "Regular");
         }
     }
 
@@ -471,10 +481,10 @@ public class GameView extends Pane {
                 break;
 
             case 5:
-                // Wave 5: Boss battle
-                if (bossDestroyed) {
-                    logger.info("Wave 5 completed - Game Over");
-                    startNextWave(); // จะไปเรียก endGame()
+                // Wave 5: Boss battle - don't check for asteroids or regular enemies
+                if (boss != null && !boss.isAlive()) {
+                    logger.info("Boss defeated - Game Over");
+                    startNextWave();
                 }
                 break;
         }
@@ -539,8 +549,16 @@ public class GameView extends Pane {
         Point2D spawnPos = new Point2D(DEFAULT_WIDTH/2, -50);
         boss = new Boss(spawnPos, currentWave);
         gameStage.addGameObject(boss);
-        // Initialize boss health bar
-        gameStage.updateBossHealth(1.0, false); // Start with full health
+//        boss.addToPane(gameStage); // Add boss's health bar
+        gameStage.updateBossHealth(1.0, false);
+
+        // Clear existing enemies when boss spawns
+        for (Enemy enemy : new ArrayList<>(enemies)) {
+            gameStage.removeGameObject(enemy);
+        }
+        enemies.clear();
+
+        logger.info("Boss spawned at wave {}", currentWave);
     }
 
     private void spawnAsteroids() {
@@ -590,7 +608,7 @@ public class GameView extends Pane {
             logger.info("Wave {}: Spawned 5 random objects", currentWave);
         }
     }
-// ตรงนี้
+
     // Public control methods
     public void startGame() {
         if (!isGameStarted) {
@@ -606,7 +624,7 @@ public class GameView extends Pane {
             spawnInitialEnemies();
 
             // Reset score and wave
-            currentWave = 1;
+            currentWave = 1;//เอาไว้เปลี่ยนด่าน
             gameStage.getScoreSystem().reset();
             gameStage.updateWave(currentWave);
 
