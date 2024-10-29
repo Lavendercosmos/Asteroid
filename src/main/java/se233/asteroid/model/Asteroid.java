@@ -30,6 +30,8 @@ public class Asteroid extends Character {
     private static final double METEOR_RADIUS = 25;
     private static final int EXPLOSION_FRAMES = 5;
     private static final Duration FRAME_DURATION = Duration.millis(100);
+    private static final double EXPLOSION_SCALE = 1.5; // Scale factor for explosion
+
     // Type enumeration
     public enum Type {
         ASTEROID,
@@ -88,6 +90,8 @@ public class Asteroid extends Character {
         logger.info("Created asteroid at position: {} with speed: {} and angle: {}°",
                 position, currentSpeed, Math.toDegrees(directionAngle));
     }
+
+
 
     private void initializeVelocity() {
         // Calculate velocity components based on direction and speed
@@ -200,28 +204,20 @@ public class Asteroid extends Character {
             isExploding = true;
             currentExplosionFrame = 0;
 
-            // ใช้ตำแหน่งปัจจุบันของ asteroid
-            double asteroidX = position.getX() - baseWidth/2;
-            double asteroidY = position.getY() - baseHeight/2;
+            // Calculate centered position for explosion
+            double explosionX = position.getX() - (baseWidth * EXPLOSION_SCALE / 2);
+            double explosionY = position.getY() - (baseHeight * EXPLOSION_SCALE / 2);
 
-            // ไม่ต้องปรับขนาด sprite ให้ใหญ่ขึ้น ใช้ขนาดเดิม
-            sprite.setFitWidth(baseWidth );  // ใช้ขนาดเดิมของ asteroid
-            sprite.setFitHeight(baseHeight );
+            // Set initial explosion position
+            sprite.setTranslateX(explosionX);
+            sprite.setTranslateY(explosionY);
 
-            // ปรับตำแหน่งให้ centered
-            sprite.setTranslateX(asteroidX);
-            sprite.setTranslateY(asteroidY);
+            // Reset any rotation for the explosion
+            sprite.setRotate(0);
 
             // Start explosion animation
             setupExplosionAnimation();
             explosionAnimation.play();
-
-            // ลบ sprite เมื่อ animation จบ
-            explosionAnimation.setOnFinished(event -> {
-                sprite.setVisible(false);  // ซ่อน sprite
-                sprite.setImage(null);     // ลบรูปภาพ
-                isAlive = false;           // ตั้งค่าว่าถูกทำลายแล้ว
-            });
         }
     }
 
@@ -237,28 +233,35 @@ public class Asteroid extends Character {
     private List<Image> loadExplosionFrames() {
         List<Image> frames = new ArrayList<>();
         try {
-            // Choose explosion sprite sheet based on type
             String explodePath = (type == Type.ASTEROID) ? ASTEROID_EXPLODE_PATH : ASTEROID_EXPLODE_PATH;
             Image explodeSheet = new Image(getClass().getResourceAsStream(explodePath));
 
+            // Calculate dimensions for each frame
             double frameWidth = explodeSheet.getWidth() / EXPLOSION_FRAMES;
             double frameHeight = explodeSheet.getHeight();
 
-            // คำนวณ scale factor เพื่อให้ explosion มีขนาดเท่ากับ asteroid
-            double scaleX = baseWidth / frameWidth;
-            double scaleY = baseHeight / frameHeight;
-            double scale = Math.min(scaleX, scaleY);
+            // Scale explosion to be slightly larger than the original asteroid
+            double scaledWidth = baseWidth * EXPLOSION_SCALE;
+            double scaledHeight = baseHeight * EXPLOSION_SCALE;
 
             for (int i = 0; i < EXPLOSION_FRAMES; i++) {
-                Canvas canvas = new Canvas(frameWidth* scale, frameHeight* scale);
+                Canvas canvas = new Canvas(scaledWidth, scaledHeight);
                 GraphicsContext gc = canvas.getGraphicsContext2D();
 
-                gc.drawImage(explodeSheet,
-                        i * frameWidth, 0,
-                        frameWidth, frameHeight,
-                        0, 0,
-                        frameWidth * scale, frameHeight * scale);
+                // Enable better quality rendering
+                gc.setImageSmoothing(true);
 
+                // Calculate source rectangle from sprite sheet
+                double srcX = i * frameWidth;
+                double srcY = 0;
+
+                // Draw the frame centered on the canvas with scaling
+                gc.drawImage(explodeSheet,
+                        srcX, srcY, frameWidth, frameHeight,  // source rectangle
+                        0, 0, scaledWidth, scaledHeight       // destination rectangle
+                );
+
+                // Create snapshot with transparency
                 SnapshotParameters params = new SnapshotParameters();
                 params.setFill(Color.TRANSPARENT);
                 Image frame = canvas.snapshot(params, null);
@@ -273,15 +276,28 @@ public class Asteroid extends Character {
 
     private void setupExplosionAnimation() {
         explosionAnimation = new Timeline();
-        Duration frameTime = Duration.millis(100);
+
+        // Create frames with scaling effect
         for (int i = 0; i < explosionFrames.size(); i++) {
             final int frameIndex = i;
+
             KeyFrame keyFrame = new KeyFrame(
-                    frameTime.multiply(i + 1),
+                    FRAME_DURATION.multiply(i + 1),
                     e -> {
                         sprite.setImage(explosionFrames.get(frameIndex));
-                        sprite.setFitWidth(baseWidth);
-                        sprite.setFitHeight(baseHeight);
+
+                        // Scale the sprite based on frame index
+                        double progress = frameIndex / (double)(explosionFrames.size() - 1);
+                        double currentScale = 1.0 + (progress * (EXPLOSION_SCALE - 1.0));
+
+                        sprite.setFitWidth(baseWidth * currentScale);
+                        sprite.setFitHeight(baseHeight * currentScale);
+
+                        // Adjust position to keep explosion centered
+                        double offsetX = (sprite.getFitWidth() - baseWidth) / 2;
+                        double offsetY = (sprite.getFitHeight() - baseHeight) / 2;
+                        sprite.setTranslateX(position.getX() - (baseWidth / 2) - offsetX);
+                        sprite.setTranslateY(position.getY() - (baseHeight / 2) - offsetY);
                     }
             );
             explosionAnimation.getKeyFrames().add(keyFrame);

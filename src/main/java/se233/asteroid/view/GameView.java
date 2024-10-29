@@ -41,6 +41,7 @@ public class GameView extends Pane {
     private static final int MAX_BOSS_SPAWNED_ENEMIES = 6; // Maximum enemies spawned by boss
     private double bossSpawnTimer = 0;
 
+
     // Game components
     private final GameStage gameStage;
     private final List<Character> gameObjects;
