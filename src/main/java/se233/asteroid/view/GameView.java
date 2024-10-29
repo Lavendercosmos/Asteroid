@@ -17,7 +17,7 @@ public class GameView extends Pane {
     private static final Logger logger = LogManager.getLogger(GameView.class);
 
     // Game constants
-    public static final double DEFAULT_WIDTH = 800;
+    public static final double DEFAULT_WIDTH = 800;//
     public static final double DEFAULT_HEIGHT = 600;
     private static final double BORDER_MARGIN = 100;
     private static final long BULLET_COOLDOWN = 250_000_000L; // 250ms
