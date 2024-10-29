@@ -40,8 +40,6 @@ public class Bullet extends Character {
             // Configure sprite
             configureSprite();
 
-            logger.debug("Bullet initialized at position: {} with velocity: {}, isEnemyBullet: {}",
-                    position, velocity, isEnemyBullet);
         } catch (Exception e) {
             logger.error("Failed to initialize bullet", e);
             throw new RuntimeException("Failed to initialize bullet", e);

@@ -24,15 +24,12 @@ public class GameView extends Pane {
     private static final int INITIAL_ENEMIES = 2;
     private static final double ENEMY_SPAWN_CHANCE = 0.01; // 1% chance per frame
     private static final int MAX_ENEMIES = 3;
-    private static final int POINTS_REGULAR_ENEMY = 100;
-    private static final int POINTS_SECOND_TIER_ENEMY = 250;
 
     // Game components
     private final GameStage gameStage;
     private final List<Character> gameObjects;
     private final List<Bullet> bullets;
     private final List<Enemy> enemies;
-    private final List<EnemyBullet> enemybullets;
     private PlayerShip player;
     private Boss boss;
 
@@ -50,7 +47,6 @@ public class GameView extends Pane {
         // Initialize collections
         this.gameObjects = new ArrayList<>();
         this.bullets = new ArrayList<>();
-        this.enemybullets = new ArrayList<>();
         this.enemies = new CopyOnWriteArrayList<>();
         this.random = new Random();
 
@@ -121,34 +117,17 @@ public class GameView extends Pane {
                 if (player != null && player.isAlive()) {
                     enemy.updateAI(player.getPosition());
 
-                    EnemyBullet enemyBullet = enemy.enemyshoot();
-                    if (enemyBullet != null) {
-                        enemybullets.add(enemyBullet);
-                        gameStage.addEnemyBullet(enemyBullet);
-                        logger.debug("Enemy fired bullet from position: {}", enemy.getPosition());
-                    }
-
+                // Enemy shooting logic - แก้ไขส่วนนี้
+                if (enemy.isInShootingRange(player.getPosition()) && enemy.getShootingCooldown() <= 0) {
+                    Bullet bullet = enemy.shoot(player.getPosition());
+                    if (bullet != null) {
+                        bullets.add(bullet);
+                        gameStage.addBullet(bullet);
+                        logger.debug("Enemy fired bullet at player from position: {}", enemy.getPosition());
+                    }}
                 }
                 wrapAround(enemy);
             }
-        }
-
-        // Update enemy bullets
-        Iterator<EnemyBullet> enemybullet = enemybullets.iterator();
-        while (enemybullet.hasNext()) {
-            EnemyBullet ebullet = enemybullet.next();
-            if (ebullet.isActive()) {
-                ebullet.update();
-
-                // Remove bullets that are offscreen or expired
-                if (isOffScreen(ebullet.getPosition()) || ebullet.isExpired()) {
-                    gameStage.removeEnemyBullet(ebullet);
-                    enemybullet.remove();
-                    logger.debug("Removed bullet: {}", ebullet);
-                }
-            }else {
-                gameStage.removeEnemyBullet(ebullet);
-                enemybullet.remove();}
         }
 
         // Update bullets
@@ -158,12 +137,12 @@ public class GameView extends Pane {
             if (bullet.isActive()) {
                 bullet.update();
 
-                // Remove bullets that are offscreen or expired
-                if (isOffScreen(bullet.getPosition()) || bullet.isExpired()) {
-                    gameStage.removeBullet(bullet);
-                    bulletIter.remove();
-                    logger.debug("Removed bullet: {}", bullet);
-                }
+            // Remove bullets that are offscreen or expired
+            if (isOffScreen(bullet.getPosition()) || bullet.isExpired()) {
+                gameStage.removeBullet(bullet);
+                bulletIter.remove();
+                logger.debug("Removed bullet: {}", bullet);
+            }
             }else {
                 gameStage.removeBullet(bullet);
                 bulletIter.remove();}
@@ -243,13 +222,6 @@ public class GameView extends Pane {
                         break;
                     }
                 }
-            }
-        }
-
-        for (EnemyBullet enemyBullet : enemybullets) {
-            if (enemyBullet.isAlive()  && player.collidesWith(enemyBullet)) {
-                handlePlayerCollision();
-                break;
             }
         }
 
@@ -618,7 +590,7 @@ public class GameView extends Pane {
             logger.info("Wave {}: Spawned 5 random objects", currentWave);
         }
     }
-    // ตรงนี้
+// ตรงนี้
     // Public control methods
     public void startGame() {
         if (!isGameStarted) {
@@ -628,9 +600,7 @@ public class GameView extends Pane {
             // Initialize player
             player = new PlayerShip(new Point2D(DEFAULT_WIDTH/2, DEFAULT_HEIGHT/2));
             gameStage.addGameObject(player);
-            // เพิ่ม sprite ของไอพ่นเข้าไปใน gameLayer
-            gameStage.getGameLayer().getChildren().add(player.getThrusterSprite());
-            gameStage.getGameLayer().getChildren().add(player.getShieldSprite());
+
             // Spawn initial objects
             spawnAsteroids();
             spawnInitialEnemies();
@@ -664,7 +634,6 @@ public class GameView extends Pane {
         gameObjects.clear();
         bullets.clear();
         enemies.clear();
-        enemybullets.clear();
         if (boss != null) {
             gameStage.hideBossHealth(); // Hide health bar when resetting game
             boss = null;
