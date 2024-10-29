@@ -275,7 +275,7 @@ public class PlayerShip extends Character {
     }
 
     public void hit() {
-        if (!isInvulnerable && !isExploding && isAlive) {
+        if (!isInvulnerable && !isExploding && isAlive) {//ค่าชีวิต เปิดอมตะได้
             lives--;
                //explode();
             logger.info("Ship hit! Lives remaining: {}", lives);
