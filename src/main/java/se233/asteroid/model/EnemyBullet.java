@@ -6,17 +6,16 @@ import javafx.scene.image.ImageView;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-public class Bullet extends Character {
-    private static final Logger logger = LogManager.getLogger(Bullet.class);
+public class EnemyBullet extends Character {
+    private static final Logger logger = LogManager.getLogger(EnemyBullet.class);
 
     // Constants
-    private static final double BULLET_SPEED = 10.0;
-    private static final String BULLET_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Fx_01.png";
+    private static double BULLET_SPEED = 5.0;
+    private static final String BULLET_SPRITE_PATH = "/se233/asteroid/assets/Enemy/Enemy_shoot.png";
     private static final double BULLET_SIZE = 15.0;
-    private static final double BULLET_RADIUS = 2.0;
-    private static final double BULLET_LIFETIME = 2.0; // seconds
+    private static double BULLET_LIFETIME = 1.5; // seconds
     private static final int BULLET_DAMAGE = 10;
-
+    private static final double BULLET_RADIUS = 2.0;
     // State
     private boolean active;
     private double lifetime;
@@ -24,9 +23,15 @@ public class Bullet extends Character {
 
 
 
-    public Bullet(Point2D position, Point2D direction, boolean isEnemyBullet) {
+    public  EnemyBullet(Point2D position, Point2D direction, boolean isEnemyBullet) {
         super(BULLET_SPRITE_PATH, position, BULLET_SIZE);
+        this.velocity = direction.multiply(BULLET_SPEED);
+        this.lifetime = BULLET_LIFETIME;
         initializeBullet(direction, isEnemyBullet);
+
+
+
+
     }
 
     private void initializeBullet(Point2D direction, boolean isEnemyBullet) {
@@ -56,7 +61,8 @@ public class Bullet extends Character {
 
         // If it's an enemy bullet, tint it red
         if (isEnemyBullet) {
-            sprite.setStyle("-fx-effect: dropshadow(gaussian, greenyellow, 10, 0.5, 0, 0);");
+
+            sprite.setStyle("-fx-effect: dropshadow(gaussian, green, 10, 0.5, 0, 0);");
         }
 
         // Set rotation based on velocity direction

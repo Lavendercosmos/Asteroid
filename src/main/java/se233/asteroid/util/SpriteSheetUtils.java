@@ -11,13 +11,6 @@ import org.apache.logging.log4j.Logger;
 public class SpriteSheetUtils {
     private static final Logger logger = LogManager.getLogger(SpriteSheetUtils.class);
 
-    /**
-     * Extracts individual frames from a sprite sheet
-     * @param resourcePath Path to the sprite sheet resource
-     * @param frameCount Number of frames to extract
-     * @param isVertical Whether the sprite sheet is arranged vertically
-     * @return List of Image frames
-     */
     public static List<Image> extractFrames(String resourcePath, int frameCount, boolean isVertical) {
         List<Image> frames = new ArrayList<>();
         try {
@@ -43,14 +36,6 @@ public class SpriteSheetUtils {
         }
     }
 
-    /**
-     * Extracts frames with transparency adjustment
-     * @param resourcePath Path to the sprite sheet resource
-     * @param frameCount Number of frames to extract
-     * @param isVertical Whether the sprite sheet is arranged vertically
-     * @param alphaThreshold Threshold for transparency (0-255)
-     * @return List of Image frames
-     */
     public static List<Image> extractFramesWithAlpha(String resourcePath, int frameCount, boolean isVertical, int alphaThreshold) {
         List<Image> frames = new ArrayList<>();
         try {
