@@ -20,8 +20,8 @@ public class Score {
     // Score constants
     public static final int ASTEROID_POINTS = 2;
     public static final int METEOR_POINTS = 1;
-    public static final int REGULAR_ENEMY_POINTS = 3;
-    public static final int SECOND_TIER_ENEMY_POINTS = 4;
+    public static final int REGULAR_ENEMY_POINTS = 1;
+    public static final int SECOND_TIER_ENEMY_POINTS = 2;
     public static final int BOSS_POINTS = 10;
 
     private int currentScore;
