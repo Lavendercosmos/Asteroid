@@ -72,6 +72,7 @@ public class GameView extends Pane {
         gameStage.getStartButton().setOnAction(e -> startGame());
         gameStage.getRestartButton().setOnAction(e -> resetGame());
         gameStage.getResumeButton().setOnAction(e -> resumeGame());
+        gameStage.getTryAgainButton().setOnAction(e -> resetGame());
     }
 
     private void setupGameLoop() {

@@ -62,6 +62,7 @@ public class GameStage extends Pane {
     private Button startButton;
     private Button restartButton;
     private Button resumeButton;
+    private Button TryAgainButton;
     private VBox startMenuVBox;
 
     // Game State
@@ -322,9 +323,9 @@ public class GameStage extends Pane {
         Text gameOverText = new Text("GAME OVER");
         gameOverText.setStyle(STYLE_HEADER);
 
-        Button restartButton = createStyledButton("Try Again");
+        TryAgainButton = createStyledButton("Try Again");
 
-        gameOverVBox.getChildren().addAll(gameOverText, restartButton);
+        gameOverVBox.getChildren().addAll(gameOverText, TryAgainButton);
         gameOverVBox.setLayoutX((WINDOW_WIDTH - 300) / 2);
         gameOverVBox.setLayoutY((WINDOW_HEIGHT - 200) / 2);
 
@@ -985,6 +986,10 @@ public class GameStage extends Pane {
             return isPaused;
         }
 
+        public Button getTryAgainButton(){
+            return  TryAgainButton;
+        }
+
         public void reset () {
             // Reset game state
             isGameStarted = false;
@@ -1013,9 +1018,6 @@ public class GameStage extends Pane {
 
             // Clear effects
             gameLayer.setEffect(null);
-
-            // Reset scale if needed
-            updateScale();
 
             logger.info("Game stage reset completed");
         }
