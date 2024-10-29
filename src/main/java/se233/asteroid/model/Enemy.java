@@ -17,7 +17,7 @@ public class Enemy extends Character {
 
     // Movement constants
     // Update movement constants for regular enemy
-    private static final double DEFAULT_SPEED = 0.5;
+    private static final double DEFAULT_SPEED = 0.5;//
     private static final double SECOND_TIER_SPEED = 1.0;
     private static final double DEFAULT_HITBOX = 15.0;
     private static final double SECOND_TIER_HITBOX = 20.0;
