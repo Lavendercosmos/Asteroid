@@ -25,7 +25,7 @@ public abstract class Character {
     protected Point2D position;
     protected Point2D velocity;
     protected double rotation;
-    protected ImageView sprite;
+    public ImageView sprite;
     protected double hitRadius;
     protected boolean isAlive;
     protected boolean debugMode;
