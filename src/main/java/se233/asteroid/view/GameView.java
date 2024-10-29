@@ -590,7 +590,7 @@ public class GameView extends Pane {
             logger.info("Wave {}: Spawned 5 random objects", currentWave);
         }
     }
-
+// ตรงนี้
     // Public control methods
     public void startGame() {
         if (!isGameStarted) {
