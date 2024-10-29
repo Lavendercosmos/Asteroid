@@ -39,7 +39,7 @@ public class GameController {
     private Boss boss;
     private int currentWave = 1;
 
-    private int currentScore=0;
+    private int score;
     private boolean gameOver;
     private boolean isGameStarted;
     private long lastUpdateTime;
@@ -143,7 +143,7 @@ public class GameController {
         asteroids.clear();
         bullets.clear();
         boss = null;
-        currentScore = 0;
+        score = 0;
         currentWave = 1;
         gameOver = false;
 
@@ -152,7 +152,7 @@ public class GameController {
         gameStage.addGameObject(player);
 
         // Update UI
-        gameStage.updateScore(currentScore);
+        gameStage.getScoreSystem().reset();
         gameStage.updateLives(player.getLives());
         gameStage.updateWave(currentWave);
         gameStage.hideGameOver();
@@ -274,10 +274,6 @@ public class GameController {
                         asteroidIter.remove();
                         gameStage.removeGameObject(asteroid);
 
-                        // ให้คะแนน
-                        currentScore += ASTEROID_POINTS;
-                        gameStage.updateScore(currentScore);
-
                         // สร้าง fragments ที่มีการ offset ตำแหน่งและตั้งค่า invulnerable
                         List<Asteroid> fragments = asteroid.split();
                         for (Asteroid fragment : fragments) {
@@ -287,7 +283,7 @@ public class GameController {
                         }
 
                         logger.info("Asteroid destroyed! Points awarded: {}, Total score: {}",
-                                ASTEROID_POINTS, currentScore);
+                                ASTEROID_POINTS, score);
                     }
                     break; // ออกจากการตรวจสอบอุกาบาตหลังจากพบการชน
                 }
@@ -346,12 +342,12 @@ public class GameController {
             }
 
             // แสดงหน้า game over
-            gameStage.showGameOver(currentScore);
+            gameStage.showGameOver(score);
 
             // ทำความสะอาด objects ที่เหลือ
             clearGameObjects();
 
-            logger.info("Game Over! Final score: {}", currentScore);
+            logger.info("Game Over! Final score: {}", score);
         }
     }
     private void clearGameObjects() {
@@ -387,14 +383,9 @@ public class GameController {
         gameStage.showExplosion(bullet.getPosition());
 
         if (!boss.isAlive()) {
-            // Boss ให้คะแนนมากกว่าศัตรูธรรมดา
-            int bossPoints = SECOND_TIER_ENEMY_POINTS * 5;  // ตัวอย่าง: boss ให้ 10 คะแนน
-            currentScore += bossPoints;
-            gameStage.updateScore(currentScore);
+            // ตัวอย่าง: boss ให้ 10 คะแนน
+            gameStage.getScoreSystem().addBossPoints();
             gameStage.removeGameObject(boss);
-
-            logger.info("Boss destroyed! Points awarded: {}, Total score: {}",
-                    bossPoints, currentScore);
 
             currentWave++;
             if (currentWave <= MAX_WAVES) {
@@ -403,9 +394,9 @@ public class GameController {
                 spawnAsteroids(INITIAL_ASTEROIDS + currentWave);
                 logger.info("Wave {} completed, starting next wave", currentWave - 1);
             } else {
-                gameStage.showVictory(currentScore);
+                gameStage.showVictory(score);
                 gameOver = true;
-                logger.info("Game completed! Final score: {}", currentScore);
+                logger.info("Game completed! Final score: {}", score);
             }
         }
     }
@@ -513,5 +504,9 @@ public class GameController {
         if (boss != null) {
             gameStage.removeGameObject(boss);
         }
+    }
+    private void endGame() {
+        gameOver = true;
+        gameStage.showGameOver(gameStage.getScoreSystem().getCurrentScore());
     }
 }

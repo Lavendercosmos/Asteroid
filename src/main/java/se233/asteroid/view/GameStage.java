@@ -29,6 +29,7 @@ import se233.asteroid.model.Bullet;
 import se233.asteroid.model.Boss;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import se233.asteroid.model.Score;
 
 import java.util.Objects;
 
@@ -49,6 +50,7 @@ public class GameStage extends Pane {
     private Pane effectLayer;
     private Pane uiLayer;
     private Pane particleLayer;
+    private Score scoreSystem;
 
     // UI Elements
     public Text scoreText;
@@ -75,15 +77,18 @@ public class GameStage extends Pane {
     private double scaleY = 1;
 
     private Group victoryGroup;
-
+    public Pane getUiLayer() {return uiLayer;}
 
     public GameStage() {
         initializeStage();
         setupLayers();
         setupBackground();
+        this.scoreSystem = new Score(this);
         setupUI();
         setupGameState();
         setupScaling();
+
+
         logger.info("GameStage initialized successfully");
     }
 
@@ -215,20 +220,17 @@ public class GameStage extends Pane {
     }
 
     private void setupHUD() {
-        // สร้าง score text ด้วยสไตล์ที่ชัดเจน
-        scoreText = new Text(20, 30, "Score: "+ currentScore);
-        scoreText.setFont(Font.font("Arial", FontWeight.BOLD, 24));
-        scoreText.setFill(Color.YELLOW); // เปลี่ยนสีให้เด่นชัด
-        scoreText.setEffect(new DropShadow(3, Color.BLACK)); // เพิ่ม effect ให้อ่านง่าย
-
-        // จัดการ UI อื่นๆ
+        // จัดการเฉพาะ lives และ wave text
         livesText = createStyledText("Lives: " + currentLives, 20, 60);
         waveText = createStyledText("Wave: " + currentWave, WINDOW_WIDTH - 150, 30);
 
-        uiLayer.getChildren().addAll(scoreText, livesText, waveText);
+        // เพิ่ม score text จาก Score class
+        uiLayer.getChildren().addAll(livesText, waveText);
 
-        // นำ score text ไว้ด้านหน้าสุด
-        scoreText.toFront();
+        // ใส่ score text ไว้ด้านหน้าสุด
+        if (scoreText != null) {
+            scoreText.toFront();
+        }
     }
 
 
@@ -592,30 +594,13 @@ public class GameStage extends Pane {
     }
 
     // แก้ไขเมธอด updateScore
-    public void updateScore(int score) {
-        this.currentScore = score;
-        if (scoreText != null) {
-            Platform.runLater(() -> {
-                scoreText.setText("Score: " + score);
-
-                // เพิ่ม effect เมื่อคะแนนเปลี่ยน
-                ScaleTransition st = new ScaleTransition(Duration.millis(100), scoreText);
-                st.setFromX(1.2);
-                st.setFromY(1.2);
-                st.setToX(1.0);
-                st.setToY(1.0);
-                st.play();
-            });
-        }
-        logger.debug("Score updated to: {}", score);
+    public Score getScoreSystem() {
+        return scoreSystem;
     }
 
     // เพิ่มเมธอดสำหรับรีเซ็ตคะแนน
     private void resetScore() {
-        currentScore = 0;
-        if (scoreText != null) {
-            scoreText.setText("Score:0");
-        }
+        scoreSystem.reset();
     }
 
     public void showScorePopup(int points, Point2D position) {
@@ -1009,7 +994,6 @@ public class GameStage extends Pane {
             resetScore();
 
             // Reset UI elements
-            scoreText.setText("Score: 0");
             livesText.setText("Lives: 3");
             waveText.setText("Wave: 1");
 
@@ -1035,9 +1019,4 @@ public class GameStage extends Pane {
 
             logger.info("Game stage reset completed");
         }
-
-    public double getStageWidth() { return WINDOW_WIDTH * scale.getX(); }
-    public double getStageHeight() { return WINDOW_HEIGHT * scale.getY(); }
-    public double getCurrentScaleX() {return scale.getX();}
-    public double getCurrentScaleY() { return scale.getY();}
 }
