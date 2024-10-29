@@ -1,5 +1,7 @@
 package se233.asteroid.model;
-
+import se233.asteroid.exception.*;
+import javafx.application.Platform;
+import javafx.scene.control.Alert;
 import javafx.geometry.Point2D;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -49,7 +51,7 @@ public abstract class Character {
 
         } catch (Exception e) {
             logger.error("Failed to load sprite: " + spritePath, e);
-            throw new RuntimeException("Failed to initialize character sprite: " + spritePath, e);
+            throw new ResourceLoadException("Failed to initialize character sprite: " + spritePath, e);
         }
     }
 

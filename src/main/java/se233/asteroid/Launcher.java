@@ -1,11 +1,15 @@
 package se233.asteroid;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
+import se233.asteroid.exception.GameException;
+import se233.asteroid.exception.GameExceptionHandler;
+import se233.asteroid.exception.GameInitializationException;
 import se233.asteroid.view.GameView;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -25,6 +29,9 @@ public class Launcher extends Application {
         try {
             // Initialize components
             gameView = new GameView();
+            if (gameView == null) {
+                throw new GameInitializationException("Failed to initialize GameView");
+            }
             pressedKeys = new HashSet<>();
 
             // Create root pane for centering
@@ -60,8 +67,13 @@ public class Launcher extends Application {
 
             logger.info("Game initialized with fixed dimensions: {}x{}",
                     fixedWidth, fixedHeight);
+        } catch (GameException ex) {
+            GameExceptionHandler.handleException(ex);
+            Platform.exit();
         } catch (Exception e) {
-            logger.error("Failed to start game", e);
+            GameExceptionHandler.handleException(
+                    new GameInitializationException("Unexpected error during game startup", e));
+            Platform.exit();
         }
     }
 
