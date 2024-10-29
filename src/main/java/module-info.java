@@ -1,9 +1,12 @@
-module se.asteroid {
+module se233.asteroid {
+    // Required JavaFX modules
     requires javafx.controls;
-    requires javafx.fxml;
-    requires java.desktop;
+    requires javafx.graphics;
     requires org.apache.logging.log4j;
 
-    opens se233.asteroid to javafx.fxml;
+    // Export the package containing your main application class
     exports se233.asteroid;
+    exports se233.asteroid.view;
+    exports se233.asteroid.model;
+
 }

@@ -422,9 +422,6 @@ public class Boss extends Character {
         }
     }
 
-    /**
-     * Updates the boss's movement pattern.
-     */
     private void updateMovementPattern() {
         if (isEnraged) {
             chasePlayer();
@@ -440,9 +437,6 @@ public class Boss extends Character {
         }
     }
 
-    /**
-     * Moves the boss in a circular pattern.
-     */
     private void moveInCircle() {
         double radius = 150;
         double speed = isEnraged ? BASE_SPEED * 1.5 : BASE_SPEED;
@@ -477,9 +471,6 @@ public class Boss extends Character {
         }
     }
 
-    /**
-     * Moves the boss in a spiral pattern.
-     */
     private void moveInSpiral() {
         double expandingRadius = 50 + patternTimer * 20;
         double angle = patternTimer * 3;
@@ -494,9 +485,6 @@ public class Boss extends Character {
         }
     }
 
-    /**
-     * Handles random teleportation movement.
-     */
     private void handleTeleport() {
         if (patternTimer >= 1.0) {
             setPosition(getRandomPosition());
@@ -607,9 +595,6 @@ public class Boss extends Character {
         return "normal"; // ใช้สถานะปกติเป็นค่าเริ่มต้น
     }
 
-    /**
-     * Changes the current attack pattern.
-     */
     private void changePattern() {
         AttackPattern[] patterns = AttackPattern.values();
         AttackPattern newPattern;
@@ -628,9 +613,6 @@ public class Boss extends Character {
         }
     }
 
-    /**
-     * Generates a random position within screen bounds.
-     */
     private Point2D getRandomPosition() {
         double margin = 50;  // Keep boss away from screen edges
         return new Point2D(
@@ -695,10 +677,6 @@ public class Boss extends Character {
         }
     }
 
-
-    /**
-     * Handles the boss entering enraged state.
-     */
     private void enterEnragedState() {
         isEnraged = true;
         logger.info("Boss entering enraged state!");
@@ -712,9 +690,6 @@ public class Boss extends Character {
         }
     }
 
-    /**
-     * Handles the boss's death.
-     */
     private void die() {
         isExplodingFinal = true;
         explosionFrame = 0;
@@ -729,9 +704,6 @@ public class Boss extends Character {
         logger.info("Boss starting death animation at wave {}", wave);
     }
 
-    /**
-     * Cleans up resources when the boss is destroyed.
-     */
     public void cleanup() {
         if (healthBarGroup != null && healthBarGroup.getParent() instanceof Pane) {
             ((Pane) healthBarGroup.getParent()).getChildren().remove(healthBarGroup);
@@ -771,9 +743,6 @@ public class Boss extends Character {
         return bullets;
     }
 
-    /**
-     * Adds the boss's health bar to a pane.
-     */
     public void addToPane(Pane pane) {
         if (healthBarGroup != null && !pane.getChildren().contains(healthBarGroup)) {
             pane.getChildren().add(healthBarGroup);
@@ -782,23 +751,14 @@ public class Boss extends Character {
 
     // Getters and Setters
 
-    /**
-     * Gets the list of active bullets.
-     */
     public List<Bullet> getBullets() {
         return activeBullets;
     }
 
-    /**
-     * Gets the boss's current health percentage.
-     */
     public double getHealthPercentage() {
         return (double) health / maxHealth;
     }
 
-    /**
-     * Gets whether the boss is in enraged state.
-     */
     public boolean isEnraged() {
         return isEnraged;
     }
@@ -824,16 +784,10 @@ public class Boss extends Character {
         return maxHealth;
     }
 
-    /**
-     * Gets the current attack pattern.
-     */
     public AttackPattern getCurrentPattern() {
         return currentPattern;
     }
 
-    /**
-     * Checks if the boss is currently exploding.
-     */
     public boolean isExploding() {
         return isExploding;
     }

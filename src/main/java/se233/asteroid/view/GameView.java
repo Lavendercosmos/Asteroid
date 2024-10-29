@@ -34,6 +34,8 @@ public class GameView extends Pane {
     private static final double MISSILE_COOLDOWN = 10.0; // 10 seconds cooldown
     private static final int MAX_MISSILES = 10;
 
+    private static final int MAX_WINGMEN = 2;
+
     // Add to GameView.java class constants
     private static final double BOSS_SPAWN_INTERVAL = 5.0; // Spawn check every 5 seconds
     private static final int MAX_BOSS_SPAWNED_ENEMIES = 6; // Maximum enemies spawned by boss
@@ -46,6 +48,7 @@ public class GameView extends Pane {
     private final List<Bullet> bullets;
     private final List<Enemy> enemies;
     private final List<EnemyBullet> enemybullets;
+    private List<Wingman> wingmen;
     private PlayerShip player;
     private Boss boss;
 
@@ -67,6 +70,7 @@ public class GameView extends Pane {
         this.enemies = new CopyOnWriteArrayList<>();
         this.random = new Random();
         this.SpecialBullet = new ArrayList<>();
+        this.wingmen = new ArrayList<>();
 
         // Setup stage and size
         this.gameStage = new GameStage();
@@ -162,6 +166,31 @@ public class GameView extends Pane {
                 logger.debug("Missile system ready - Cooldown completed");
             }
         }
+
+        // Add wingmen update logic after player update
+        if (player != null && player.isAlive()) {
+            player.update();
+            wrapAround(player);
+
+            // Update wingmen
+            for (Wingman wingman : wingmen) {
+                if (wingman.isActive()) {
+                    wingman.update();
+                    wrapAround(wingman);
+
+                    // Automatic wingman shooting
+                    Bullet wingmanBullet = wingman.shoot();
+                    if (wingmanBullet != null) {
+                        bullets.add(wingmanBullet);
+                        gameStage.addBullet(wingmanBullet);
+                    }
+                }
+            }
+
+            // Check if new wingmen can be unlocked
+            checkWingmanUnlock();
+        }
+
 
         // Update boss
         if (boss != null && boss.isAlive()) {
@@ -304,8 +333,66 @@ public class GameView extends Pane {
         }
     }
 
+    private void checkWingmanUnlock() {
+        int currentScore = gameStage.getScoreSystem().getCurrentScore();
+
+        // Check for first wingman unlock
+        if (wingmen.isEmpty() &&
+                Wingman.canUnlockWingman(0, currentScore)) {
+            addWingman(1); // Left wing
+            logger.info("First wingman unlocked at score: {}", currentScore);
+        }
+
+        // Check for second wingman unlock
+        if (wingmen.size() == 1 &&
+                Wingman.canUnlockWingman(1, currentScore)) {
+            addWingman(2); // Right wing
+            logger.info("Second wingman unlocked at score: {}", currentScore);
+        }
+    }
+
+    private void addWingman(int position) {
+        Wingman wingman = new Wingman(player, position);
+        wingmen.add(wingman);
+        gameStage.addGameObject(wingman);
+
+        // Show notification of wingman unlock
+        gameStage.showWingmanUnlockNotification(position);
+    }
+
+
     private void checkCollisions() {
         if (player == null || !player.isAlive() || player.isInvulnerable()) return;
+
+        // Check wingman collisions with enemies and bullets
+        for (Wingman wingman : wingmen) {
+            if (!wingman.isActive()) continue;
+
+            // Check enemy bullets
+            for (EnemyBullet enemyBullet : enemybullets) {
+                if (enemyBullet.isActive() && wingman.collidesWith(enemyBullet)) {
+                    handleWingmanCollision(wingman);
+                    enemyBullet.setActive(false);
+                    gameStage.removeEnemyBullet(enemyBullet);
+                }
+            }
+
+            // Check enemy collisions
+            for (Enemy enemy : enemies) {
+                if (enemy.isAlive() && !enemy.isExploding() && wingman.collidesWith(enemy)) {
+                    handleWingmanCollision(wingman);
+                    handleEnemyHit(enemy);
+                }
+            }
+
+            // Check asteroid collisions
+            for (Character obj : gameObjects) {
+                if (obj instanceof Asteroid && obj.isAlive() && wingman.collidesWith(obj)) {
+                    handleWingmanCollision(wingman);
+                    handleAsteroidHit((Asteroid)obj);
+                }
+            }
+        }
 
         // Check bullet collisions
         Iterator<Bullet> bulletIter = new CopyOnWriteArrayList<>(bullets).iterator();
@@ -461,6 +548,15 @@ public class GameView extends Pane {
         // Remove inactive bullets
         bullets.removeIf(bullet -> !bullet.isAlive());
         SpecialBullet.removeIf(specialBullet -> !specialBullet.isAlive());
+    }
+
+    private void handleWingmanCollision(Wingman wingman) {
+        wingman.hit();
+        gameStage.showExplosion(wingman.getPosition());
+
+        if (!wingman.isActive()) {
+            logger.info("Wingman destroyed!");
+        }
     }
 
 
@@ -818,7 +914,7 @@ public class GameView extends Pane {
             gameStage.addGameObject(player);
             // เพิ่ม sprite ของไอพ่นเข้าไปใน gameLayer
             gameStage.getGameLayer().getChildren().add(player.getThrusterSprite());
-            gameStage.getGameLayer().getChildren().add(player.getShieldSprite());
+//            gameStage.getGameLayer().getChildren().add(player.getShieldSprite());
             // Spawn initial objects
             spawnAsteroids();
             spawnInitialEnemies();
@@ -859,6 +955,11 @@ public class GameView extends Pane {
             boss = null;
         }
         player = null;
+
+        for (Wingman wingman : wingmen) {
+            gameStage.removeGameObject(wingman);
+        }
+        wingmen.clear();
 
         // Rest of existing reset code...
         isGameStarted = false;
@@ -935,7 +1036,7 @@ public class GameView extends Pane {
     public void moveDown() { if (player != null) player.moveDown(); }
     public void rotateLeft() { if (player != null) player.rotateLeft(); }
     public void rotateRight() { if (player != null) player.rotateRight(); }
-    public void stopThrust() { if (player != null) player.stopThrust(); }
+
 
 
     // Getters
@@ -944,4 +1045,5 @@ public class GameView extends Pane {
     public Button getStartButton() { return gameStage.getStartButton(); }
     public Button getRestartButton() { return gameStage.getRestartButton(); }
     public Button getResumeButton() { return gameStage.getResumeButton(); }
+    public List<Wingman> getWingmen() {return Collections.unmodifiableList(wingmen);}
 }

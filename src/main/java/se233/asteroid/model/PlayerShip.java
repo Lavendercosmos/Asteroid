@@ -43,7 +43,6 @@ public class PlayerShip extends Character {
     private static final String SHIP_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Spaceships.png";
     private static final String THRUSTER_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Thruster_01.png";
     private static final String EXPLOSION_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Explosion.png";
-    private static final String SHIELD_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Shield.png";
 
     public PlayerShip(Point2D startPosition) {
         super(SHIP_SPRITE_PATH, startPosition, 5);
@@ -80,16 +79,6 @@ public class PlayerShip extends Character {
             thrusterSprite.setPreserveRatio(true);
             thrusterSprite.setVisible(false);
 
-            // Initialize shield sprite with error checking
-            var shieldStream = getClass().getResourceAsStream(SHIELD_SPRITE_PATH);
-            if (shieldStream == null) {
-                throw new RuntimeException("Could not find shield sprite: " + SHIELD_SPRITE_PATH);
-            }
-            shieldSprite = new ImageView(new Image(shieldStream));
-            shieldSprite.setFitWidth(25);
-            shieldSprite.setFitHeight(25);
-            shieldSprite.setPreserveRatio(true);
-            shieldSprite.setVisible(false);
 
             // Load animation frames with error checking
             var explosionStream = getClass().getResourceAsStream(EXPLOSION_SPRITE_PATH);
@@ -153,7 +142,6 @@ public class PlayerShip extends Character {
         invulnerabilityAnimation = new Timeline(
                 new KeyFrame(Duration.millis(100), e -> {
                     sprite.setVisible(!sprite.isVisible());
-                    shieldSprite.setVisible(sprite.isVisible());
                 })
         );
         invulnerabilityAnimation.setCycleCount(30);
@@ -177,9 +165,6 @@ public class PlayerShip extends Character {
             if (isThrusting) {
                 updateThrusterPosition();
             }
-            if (isInvulnerable) {
-                updateShieldPosition();
-            }
         }
     }
 
@@ -191,11 +176,7 @@ public class PlayerShip extends Character {
         thrusterSprite.setRotate(rotation);
     }
 
-    private void updateShieldPosition() {
-        shieldSprite.setTranslateX(position.getX() - shieldSprite.getBoundsInLocal().getWidth() / 2);
-        shieldSprite.setTranslateY(position.getY() - shieldSprite.getBoundsInLocal().getHeight() / 2);
-        shieldSprite.setRotate(rotation);
-    }
+
 
     public void moveUp() {
         if (!isExploding && isAlive) {
@@ -299,7 +280,7 @@ public class PlayerShip extends Character {
         }
     }
 
-    private void explode() {
+    public void explode() {
         isExploding = true;
         currentExplosionFrame = 0;
 
@@ -356,7 +337,6 @@ public class PlayerShip extends Character {
                 new KeyFrame(Duration.seconds(3), e -> {
                     isInvulnerable = false;
                     sprite.setVisible(true);
-                    shieldSprite.setVisible(false);
                 })
         );
         invulnerabilityTimer.play();

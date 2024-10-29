@@ -309,6 +309,72 @@ public class GameStage extends Pane {
         return button;
     }
 
+    public void showWingmanUnlockNotification(int position) {
+        String wingmanType = position == 1 ? "Left" : "Right";
+        Text notificationText = new Text(wingmanType + " Wingman Unlocked!");
+        notificationText.setFont(Font.font("Arial", FontWeight.BOLD, 24));
+        notificationText.setFill(Color.GREEN);
+        notificationText.setStroke(Color.BLACK);
+        notificationText.setStrokeWidth(1);
+
+        // Position the notification at the top center of the screen
+        double notificationX = (WINDOW_WIDTH - notificationText.getBoundsInLocal().getWidth()) / 2;
+        notificationText.setX(notificationX);
+        notificationText.setY(100);  // Show below the score/wave display
+
+        // Add glow effect
+        Glow glow = new Glow();
+        glow.setLevel(0.8);
+        notificationText.setEffect(glow);
+
+        effectLayer.getChildren().add(notificationText);
+
+        // Animation sequence
+        ParallelTransition animation = new ParallelTransition(
+                // Fade in
+                createFadeTransition(notificationText, 0, 1, 0.3),
+                // Scale up
+                createScaleTransition(notificationText, 0.5, 1.2, 0.3)
+        );
+
+        // Hold at full opacity
+        PauseTransition hold = new PauseTransition(Duration.seconds(1.5));
+
+        // Fade out and float up
+        ParallelTransition exit = new ParallelTransition(
+                createFadeTransition(notificationText, 1, 0, 0.5),
+                createMoveTransition(notificationText,
+                        notificationText.getX(),
+                        notificationText.getY() - 50,
+                        0.5)
+        );
+
+        // Chain the animations
+        SequentialTransition sequence = new SequentialTransition(
+                animation,
+                hold,
+                exit
+        );
+
+        // Clean up after animation
+        sequence.setOnFinished(e -> effectLayer.getChildren().remove(notificationText));
+
+        // Play the animation sequence
+        sequence.play();
+
+        // Play unlock sound effect (if available)
+        try {
+            // You would need to add this sound file to your resources
+            // AudioClip unlockSound = new AudioClip(getClass().getResource(
+            //     "/se233/asteroid/assets/Sounds/wingman_unlock.wav").toString());
+            // unlockSound.play();
+        } catch (Exception e) {
+            logger.warn("Could not play wingman unlock sound effect", e);
+        }
+
+        logger.info("{} wingman unlock notification displayed", wingmanType);
+    }
+
     private void setupStartMenu() {
         startMenuGroup = new Group();
         startMenuVBox = new VBox(20);
@@ -540,6 +606,8 @@ public class GameStage extends Pane {
             logger.error("Cannot add null missile or missile with null sprite");
         }
     }
+
+
 
 
     public void addEnemyBullet(EnemyBullet enemyBullet) {
