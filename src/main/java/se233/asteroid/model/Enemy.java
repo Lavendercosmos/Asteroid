@@ -37,7 +37,7 @@ public class Enemy extends Character {
 
     // Sprite paths
     private static final String REGULAR_ENEMY_SPRITE = "/se233/asteroid/assets/Enemy/Enemy_ship.png";
-    private static final String SECOND_TIER_ENEMY_SPRITE = "/se233/asteroid/assets/Enemy/Second_tier_enemy.png";
+    private static final String SECOND_TIER_ENEMY_SPRITE = "/se233/asteroid/assets/Enemy/Second-tier_enemy.png";
     private static final String REGULAR_EXPLOSION_SPRITE = "/se233/asteroid/assets/Enemy/Enemy_Explosion.png";
     private static final String SECOND_TIER_EXPLOSION_SPRITE = "/se233/asteroid/assets/Enemy/Explosion_second.png";
 
