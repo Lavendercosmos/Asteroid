@@ -1,148 +1,141 @@
+import javafx.scene.Group;
+import javafx.scene.text.Text;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.DisplayName;
 import se233.asteroid.model.Score;
 import se233.asteroid.view.GameStage;
-import javafx.scene.text.Text;
-import javafx.application.Platform;
+import static org.junit.jupiter.api.Assertions.*;
 
-import org.junit.jupiter.api.BeforeAll;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
-class ScoreTest {
+public class ScoreTest {
     private Score score;
-    private GameStage gameStage;
-    private static final long JAVAFX_TIMEOUT = 5;
+    private TestGameStage gameStage;
+
+    // Custom TestGameStage class for testing
+    private static class TestGameStage extends GameStage {
+        private final Group uiLayer;
+
+        public TestGameStage() {
+            super();
+            this.uiLayer = new Group();
+        }
+
+    }
 
     @BeforeEach
-    void setUp() {
-        try {
-            CountDownLatch latch = new CountDownLatch(1);
-            Platform.runLater(() -> {
-                try {
-                    gameStage = new GameStage();
-                    score = new Score(gameStage);
-                } finally {
-                    latch.countDown();
-                }
-            });
-            if (!latch.await(JAVAFX_TIMEOUT, TimeUnit.SECONDS)) {
-                throw new RuntimeException("Setup timed out");
-            }
-        } catch (InterruptedException e) {
-            throw new RuntimeException("Test setup was interrupted", e);
-        }
-    }
-
-    private void runAndWait(Runnable action) {
-        try {
-            CountDownLatch latch = new CountDownLatch(1);
-            Platform.runLater(() -> {
-                try {
-                    action.run();
-                } finally {
-                    latch.countDown();
-                }
-            });
-            if (!latch.await(JAVAFX_TIMEOUT, TimeUnit.SECONDS)) {
-                throw new RuntimeException("JavaFX operation timed out");
-            }
-        } catch (InterruptedException e) {
-            throw new RuntimeException("Test was interrupted", e);
-        }
+    public void setUp() {
+        // Create a test GameStage and initialize Score
+        gameStage = new TestGameStage();
+        score = new Score(gameStage);
     }
 
     @Test
-    void testInitialScore() {
-        runAndWait(() -> {
-            assertEquals(0, score.getCurrentScore(), "Initial score should be 0");
-            Text scoreText = score.getScoreText();
-            assertNotNull(scoreText, "Score text should be initialized");
-            assertEquals("Score: 0", scoreText.getText(), "Initial score display should be 'Score: 0'");
-        });
+    @DisplayName("Test initial score is zero")
+    public void testInitialScore() {
+        assertEquals(0, score.getCurrentScore(), "Initial score should be 0");
     }
 
     @Test
-    void testAddAsteroidPoints() {
-        runAndWait(() -> {
-            score.addAsteroidPoints();
-            assertEquals(Score.ASTEROID_POINTS, score.getCurrentScore(),
-                    "Score should increase by asteroid points");
-            assertEquals("Score: " + Score.ASTEROID_POINTS, score.getScoreText().getText(),
-                    "Score display should reflect asteroid points");
-        });
+    @DisplayName("Test adding asteroid points")
+    public void testAddAsteroidPoints() {
+        score.addAsteroidPoints();
+        assertEquals(Score.ASTEROID_POINTS, score.getCurrentScore(),
+                "Score should increase by asteroid points value");
     }
 
     @Test
-    void testAddMeteorPoints() {
-        runAndWait(() -> {
-            score.addMeteorPoints();
-            assertEquals(Score.METEOR_POINTS, score.getCurrentScore(),
-                    "Score should increase by meteor points");
-        });
+    @DisplayName("Test adding meteor points")
+    public void testAddMeteorPoints() {
+        score.addMeteorPoints();
+        assertEquals(Score.METEOR_POINTS, score.getCurrentScore(),
+                "Score should increase by meteor points value");
     }
 
     @Test
-    void testAddRegularEnemyPoints() {
-        runAndWait(() -> {
-            score.addRegularEnemyPoints();
-            assertEquals(Score.REGULAR_ENEMY_POINTS, score.getCurrentScore(),
-                    "Score should increase by regular enemy points");
-        });
+    @DisplayName("Test adding regular enemy points")
+    public void testAddRegularEnemyPoints() {
+        score.addRegularEnemyPoints();
+        assertEquals(Score.REGULAR_ENEMY_POINTS, score.getCurrentScore(),
+                "Score should increase by regular enemy points value");
     }
 
     @Test
-    void testAddSecondTierEnemyPoints() {
-        runAndWait(() -> {
-            score.addSecondTierEnemyPoints();
-            assertEquals(Score.SECOND_TIER_ENEMY_POINTS, score.getCurrentScore(),
-                    "Score should increase by second tier enemy points");
-        });
+    @DisplayName("Test adding second tier enemy points")
+    public void testAddSecondTierEnemyPoints() {
+        score.addSecondTierEnemyPoints();
+        assertEquals(Score.SECOND_TIER_ENEMY_POINTS, score.getCurrentScore(),
+                "Score should increase by second tier enemy points value");
     }
 
     @Test
-    void testAddBossPoints() {
-        runAndWait(() -> {
-            score.addBossPoints();
-            assertEquals(Score.BOSS_POINTS, score.getCurrentScore(),
-                    "Score should increase by boss points");
-        });
+    @DisplayName("Test adding boss points")
+    public void testAddBossPoints() {
+        score.addBossPoints();
+        assertEquals(Score.BOSS_POINTS, score.getCurrentScore(),
+                "Score should increase by boss points value");
     }
 
     @Test
-    void testMultiplePointAdditions() {
-        runAndWait(() -> {
-            score.addAsteroidPoints();
-            score.addMeteorPoints();
-            score.addBossPoints();
+    @DisplayName("Test adding multiple different points")
+    public void testAddMultiplePoints() {
+        score.addAsteroidPoints();
+        score.addMeteorPoints();
+        score.addBossPoints();
 
-            int expectedScore = Score.ASTEROID_POINTS + Score.METEOR_POINTS + Score.BOSS_POINTS;
-            assertEquals(expectedScore, score.getCurrentScore(),
-                    "Score should correctly sum multiple point additions");
-        });
+        int expectedTotal = Score.ASTEROID_POINTS + Score.METEOR_POINTS + Score.BOSS_POINTS;
+        assertEquals(expectedTotal, score.getCurrentScore(),
+                "Score should be the sum of all added points");
     }
 
     @Test
-    void testReset() {
-        runAndWait(() -> {
-            score.addBossPoints();
-            score.addAsteroidPoints();
-            score.reset();
-
-            assertEquals(0, score.getCurrentScore(), "Score should be 0 after reset");
-            assertEquals("Score: 0", score.getScoreText().getText(),
-                    "Score display should show 0 after reset");
-        });
+    @DisplayName("Test score reset")
+    public void testScoreReset() {
+        score.addPoints(100);
+        score.reset();
+        assertEquals(0, score.getCurrentScore(),
+                "Score should be 0 after reset");
     }
 
     @Test
-    void testCustomPointAddition() {
-        runAndWait(() -> {
-            int customPoints = 5;
-            score.addPoints(customPoints);
-            assertEquals(customPoints, score.getCurrentScore(),
-                    "Score should increase by custom point value");
-        });
+    @DisplayName("Test score text display")
+    public void testScoreTextDisplay() {
+        Text scoreText = score.getScoreText();
+        assertNotNull(scoreText, "Score text should not be null");
+        assertEquals("Score: 0", scoreText.getText(),
+                "Initial score text should display 'Score: 0'");
+
+        score.addPoints(5);
+        assertEquals("Score: 5", scoreText.getText(),
+                "Score text should update when points are added");
+    }
+
+    @Test
+    @DisplayName("Test adding custom points amount")
+    public void testAddCustomPoints() {
+        int customPoints = 15;
+        score.addPoints(customPoints);
+        assertEquals(customPoints, score.getCurrentScore(),
+                "Score should increase by custom points value");
+    }
+
+    @Test
+    @DisplayName("Test score text UI elements")
+    public void testScoreTextUIElements() {
+        Text scoreText = score.getScoreText();
+        assertTrue(gameStage.getUiLayer().getChildren().contains(scoreText),
+                "Score text should be added to UI layer");
+    }
+
+    @Test
+    @DisplayName("Test consecutive score updates")
+    public void testConsecutiveScoreUpdates() {
+        score.addPoints(5);
+        score.addPoints(10);
+        score.addPoints(15);
+        assertEquals(30, score.getCurrentScore(),
+                "Score should accurately track consecutive updates");
+        assertEquals("Score: 30", score.getScoreText().getText(),
+                "Score text should reflect total after consecutive updates");
     }
 }
