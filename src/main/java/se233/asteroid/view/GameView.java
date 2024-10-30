@@ -814,11 +814,30 @@ public class GameView extends Pane {
         logger.info("Starting Wave {}", currentWave);
         gameStage.updateWave(currentWave);
 
+        // Clear current wave entities
+        clearWaveEntities();
+
+        if (currentWave == 5) {
+            spawnBoss();
+        } else if (currentWave > 5) {
+            // เมื่อชนะ boss (wave 5) ให้จบเกม
+            endGame();
+        } else {
+            spawnAsteroids();
+            if (currentWave >= 2) {
+                spawnInitialEnemies();
+            }
+        }
+    }
+
+    // เพิ่มเมธอดใหม่เพื่อจัดการการล้างเอนทิตี้ต่างๆ เมื่อจบ wave
+    private void clearWaveEntities() {
         // Clear enemies
         for (Enemy enemy : new ArrayList<>(enemies)) {
             gameStage.removeGameObject(enemy);
         }
         enemies.clear();
+
         // Clear asteroids
         List<Character> asteroidsToRemove = gameObjects.stream()
                 .filter(obj -> obj instanceof Asteroid)
@@ -829,7 +848,7 @@ public class GameView extends Pane {
             gameObjects.remove(asteroid);
         }
 
-        // Clear bullets
+        // Clear all projectiles
         for (Bullet bullet : new ArrayList<>(bullets)) {
             gameStage.removeBullet(bullet);
         }
@@ -840,19 +859,10 @@ public class GameView extends Pane {
         }
         SpecialBullet.clear();
 
-        if (currentWave == 5) {
-            spawnBoss();
-        } else if (currentWave > 5) {
-            endGame();
-        } else {
-            spawnAsteroids();
-            // Ensure enemies are spawned immediately for waves 2-4
-            if (currentWave >= 2) {
-                spawnInitialEnemies();
-                logger.info("Initial enemies spawned for wave {}: {}",
-                        currentWave, enemies.size());
-            }
+        for (EnemyBullet enemyBullet : new ArrayList<>(enemybullets)) {
+            gameStage.removeEnemyBullet(enemyBullet);
         }
+        enemybullets.clear();
     }
 
 
@@ -990,7 +1000,42 @@ public class GameView extends Pane {
 
     private void endGame() {
         isGameStarted = false;
-        gameStage.showGameOver(gameStage.getScoreSystem().getCurrentScore());
+        isPaused = false;
+
+        // เช็คว่าเป็นการจบเกมจากชนะหรือแพ้
+        if (currentWave > 5) {
+            // ชนะเกม - ผ่าน wave 5
+            gameStage.showVictory(gameStage.getScoreSystem().getCurrentScore());
+            logger.info("Game completed! Player won with score: {}",
+                    gameStage.getScoreSystem().getCurrentScore());
+        } else {
+            // แพ้เกม - player หมดชีวิต
+            gameStage.showGameOver(gameStage.getScoreSystem().getCurrentScore());
+            logger.info("Game over! Final score: {}",
+                    gameStage.getScoreSystem().getCurrentScore());
+        }
+
+        // หยุดการเคลื่อนไหวทั้งหมด
+        bullets.clear();
+        SpecialBullet.clear();
+        enemybullets.clear();
+
+        // ลบ enemy และ boss ที่เหลือ
+        for (Enemy enemy : enemies) {
+            gameStage.removeGameObject(enemy);
+        }
+        enemies.clear();
+
+        if (boss != null) {
+            gameStage.removeGameObject(boss);
+            gameStage.hideBossHealth();
+            boss = null;
+        }
+
+        // ปิดการทำงานของ wingmen
+        for (Wingman wingman : wingmen) {
+            wingman.setActive(false);
+        }
     }
 
     // เพิ่มเมธอดสำหรับเริ่ม cooldown

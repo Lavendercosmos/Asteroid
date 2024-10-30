@@ -5,7 +5,7 @@ import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
 @Suite
-@SelectClasses({AsteroidTest.class, BossTest.class, EnemyTest.class , PlayerShipTest.class})
+@SelectClasses({AsteroidTest.class, BossTest.class, EnemyTest.class , PlayerShipTest.class , ScoreTest.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class JUnitTestSuite {
     @BeforeAll

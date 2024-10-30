@@ -27,10 +27,19 @@ public class Wingman extends Character {
         super(WINGMAN_SPRITE_PATH, new Point2D(0, 0), WINGMAN_SIZE);
         this.leader = leader;
         this.position = position;
-        this.health = 50; // Lower health than main ship
+        this.health = 50;
         this.isActive = true;
         this.velocity = new Point2D(0, 0);
         updatePosition();
+    }
+
+    public void setActive(boolean active) {
+        this.isActive = active;
+        sprite.setVisible(active); // Update sprite visibility
+        if (!active) {
+            // Additional cleanup when deactivating
+            health = 0;
+        }
     }
 
     @Override
@@ -89,8 +98,7 @@ public class Wingman extends Character {
     public void hit() {
         health -= 25;
         if (health <= 0) {
-            isActive = false;
-            sprite.setVisible(false);
+            setActive(false); // Use setActive instead of direct assignment
         }
     }
 
@@ -101,9 +109,6 @@ public class Wingman extends Character {
         return currentWingmen == 1 && score >= UNLOCK_SCORE_SECOND;
     }
 
-    public boolean isActive() {
-        return isActive;
-    }
 
     public void reset() {
         health = 50;
@@ -112,8 +117,11 @@ public class Wingman extends Character {
         sprite.setVisible(true);
     }
 
+
+
     // Getter methods
     public static double getUnlockScoreFirst() { return UNLOCK_SCORE_FIRST; }
     public static double getUnlockScoreSecond() { return UNLOCK_SCORE_SECOND; }
     public double getHealth() { return health; }
+    public boolean isActive() {return isActive;}
 }
