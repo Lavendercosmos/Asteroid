@@ -3,6 +3,7 @@ package se233.asteroid.exception;
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
 
+//ตัวจัดการ Exception
 public class GameExceptionHandler {
 
     public static void handleException(GameException ex) {

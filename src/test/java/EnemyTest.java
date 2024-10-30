@@ -52,19 +52,23 @@ public class EnemyTest {
     void testDistanceManagement() {
         // Test too close
         Point2D tooClosePosition = new Point2D(401, 300); // Very close to enemy
+        double initialDistance = regularEnemy.getPosition().distance(tooClosePosition);
+
         regularEnemy.updateAI(tooClosePosition);
         regularEnemy.update();
 
         double distanceAfterUpdate = regularEnemy.getPosition().distance(tooClosePosition);
-        assertTrue(distanceAfterUpdate > regularEnemy.getPosition().distance(tooClosePosition));
+        assertTrue(distanceAfterUpdate > initialDistance);
 
         // Test too far
         Point2D tooFarPosition = new Point2D(800, 300);
+        initialDistance = regularEnemy.getPosition().distance(tooFarPosition);
+
         regularEnemy.updateAI(tooFarPosition);
         regularEnemy.update();
 
         distanceAfterUpdate = regularEnemy.getPosition().distance(tooFarPosition);
-        assertTrue(distanceAfterUpdate < regularEnemy.getPosition().distance(tooFarPosition));
+        assertTrue(distanceAfterUpdate < initialDistance);
     }
 
     @Test
@@ -95,15 +99,19 @@ public class EnemyTest {
         assertNotNull(regularBullet);
         assertNotNull(secondTierBullet);
 
-        // Update multiple times to simulate time passing
-        for (int i = 0; i < 90; i++) { // ~1.5 seconds at 60 FPS
+        // Update more times to ensure cooldown expires for second tier enemy
+        // Assuming 60 FPS and second tier cooldown is 1 second
+        for (int i = 0; i < 120; i++) { // 2 seconds at 60 FPS
             regularEnemy.update();
             secondTierEnemy.update();
+            // Keep updating AI to maintain shooting conditions
+            regularEnemy.updateAI(playerPosition);
+            secondTierEnemy.updateAI(playerPosition);
         }
 
         // Second tier should be able to shoot again, regular should still be on cooldown
-        assertNull(regularEnemy.enemyshoot());
-        assertNotNull(secondTierEnemy.enemyshoot());
+        assertNull(regularEnemy.enemyshoot(), "Regular enemy should still be on cooldown");
+        assertNotNull(secondTierEnemy.enemyshoot(), "Second tier enemy should be able to shoot again");
     }
 
     @Test

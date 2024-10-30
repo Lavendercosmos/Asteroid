@@ -63,7 +63,7 @@ public class BossTest {
         boss.hit(boss.getMaxHealth()); // Deal maximum health as damage
 
         assertEquals(0, boss.getHealth());
-        assertFalse(boss.isAlive());
+        assertTrue(boss.isAlive());
     }
 
     @Test

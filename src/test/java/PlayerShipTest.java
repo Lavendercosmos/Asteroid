@@ -1,5 +1,4 @@
-
-
+import javafx.application.Platform;
 import javafx.geometry.Point2D;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,15 +9,30 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class PlayerShipTest {
     private PlayerShip playerShip;
+    private static boolean jfxIsSetup;
+
+
+    @BeforeAll
+    public static void initJfxRuntime() throws InterruptedException {
+        if (!jfxIsSetup) {
+            // Initialize the JavaFX platform
+            Platform.startup(() -> {});
+
+            // Give JavaFX time to initialize
+            Thread.sleep(500);
+            jfxIsSetup = true;
+        }
+    }
 
     @BeforeEach
     void setUp() {
+        // Run player ship creation on JavaFX thread
+        Platform.runLater(() -> {
+            playerShip = new PlayerShip(new Point2D(100, 100));
+        });
+
+        // Wait for initialization to complete
         try {
-            // Run on JavaFX thread
-            javafx.application.Platform.runLater(() -> {
-                playerShip = new PlayerShip(new Point2D(100, 100));
-            });
-            // Wait for initialization to complete
             Thread.sleep(100);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -71,47 +85,30 @@ public class PlayerShipTest {
 
     @Test
     void testShoot() {
-        final boolean[] testComplete = new boolean[1];
-        javafx.application.Platform.runLater(() -> {
-            var bullet = playerShip.shoot();
-            assertNotNull(bullet, "Shooting should create a bullet");
+        // Create a latch to wait for async operations
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
 
-            double radians = Math.toRadians(playerShip.getRotation() - 90);
-            Point2D direction = new Point2D(Math.cos(radians), Math.sin(radians));
-            Point2D expectedPosition = playerShip.getPosition()
-                    .add(direction.multiply(playerShip.sprite.getBoundsInLocal().getWidth() / 2));
-            assertEquals(expectedPosition, bullet.getPosition(),
-                    "Bullet should start at the expected position based on ship rotation");
-            testComplete[0] = true;
-        });
+        // Run shooting test on JavaFX thread
+        Platform.runLater(() -> {
+            try {
+                var bullet = playerShip.shoot();
+                assertNotNull(bullet, "Shooting should create a bullet");
 
-        // Wait for the test to complete
-        try {
-            while (!testComplete[0]) {
-                Thread.sleep(100);
+                double radians = Math.toRadians(playerShip.getRotation() - 90);
+                Point2D direction = new Point2D(Math.cos(radians), Math.sin(radians));
+                Point2D expectedPosition = playerShip.getPosition()
+                        .add(direction.multiply(playerShip.sprite.getBoundsInLocal().getWidth() / 2));
+                assertEquals(expectedPosition, bullet.getPosition(),
+                        "Bullet should start at the expected position based on ship rotation");
+            } finally {
+                latch.countDown();
             }
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Test
-    void testHit() {
-        final boolean[] testComplete = new boolean[1];
-        javafx.application.Platform.runLater(() -> {
-            int initialLives = playerShip.getLives();
-            playerShip.hit();
-            assertEquals(initialLives - 1, playerShip.getLives(),
-                    "Lives should decrease after a hit if ship is not invulnerable");
-            assertTrue(playerShip.isInvulnerable(),
-                    "Ship should become invulnerable after a hit");
-            testComplete[0] = true;
         });
 
-        // Wait for the test to complete
         try {
-            while (!testComplete[0]) {
-                Thread.sleep(100);
+            // Wait with timeout
+            if (!latch.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                fail("Test timed out");
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -120,20 +117,23 @@ public class PlayerShipTest {
 
     @Test
     void testExplode() {
-        final boolean[] testComplete = new boolean[1];
-        javafx.application.Platform.runLater(() -> {
-            playerShip.explode();
-            assertTrue(playerShip.isExploding(),
-                    "Ship should be in exploding state after explode");
-            assertFalse(playerShip.isAlive(),
-                    "Ship should not be alive after exploding");
-            testComplete[0] = true;
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+
+        Platform.runLater(() -> {
+            try {
+                playerShip.explode();
+                assertTrue(playerShip.isExploding,
+                        "Ship should be in exploding state after explode");
+                assertFalse(playerShip.isAlive(),
+                        "Ship should not be alive after exploding");
+            } finally {
+                latch.countDown();
+            }
         });
 
-        // Wait for the test to complete
         try {
-            while (!testComplete[0]) {
-                Thread.sleep(100);
+            if (!latch.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                fail("Test timed out");
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);

@@ -27,7 +27,7 @@ public class PlayerShip extends Character {
     // Ship states
     private int lives;
     private boolean isThrusting;
-    private boolean isExploding;
+    public boolean isExploding;
     private boolean isShootingEffect;
     private boolean isInvulnerable;
     private boolean isAlive;
