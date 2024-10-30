@@ -5,11 +5,15 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.animation.Timeline;
 import javafx.animation.KeyFrame;
+import javafx.scene.image.WritableImage;
 import javafx.util.Duration;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import java.util.List;
 import se233.asteroid.util.SpriteSheetUtils;
+
+import static se233.asteroid.model.Character.FRICTION;
+import static se233.asteroid.model.Character.MAX_SPEED;
 
 public class PlayerShip extends Character {
     private static final Logger logger = LogManager.getLogger(PlayerShip.class);
@@ -24,25 +28,32 @@ public class PlayerShip extends Character {
     private int lives;
     private boolean isThrusting;
     private boolean isExploding;
+    private boolean isShootingEffect;
     private boolean isInvulnerable;
     private boolean isAlive;
 
+
     // Sprite management
     private ImageView thrusterSprite;
-    private ImageView shieldSprite;
+    private ImageView ShootingEffect;
     private List<Image> explosionFrames;
     private List<Image> thrusterFrames;
+    private List<Image> ShootingFrames;
     private int currentExplosionFrame;
+    private int currentThrusterFrame;
+    private int currentShootingFrame;
 
     // Animations
     private Timeline explosionAnimation;
     private Timeline thrusterAnimation;
     private Timeline invulnerabilityAnimation;
+    private Timeline ShootingAnimation;
 
     // Asset paths
     private static final String SHIP_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Spaceships.png";
     private static final String THRUSTER_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Thruster_01.png";
     private static final String EXPLOSION_SPRITE_PATH = "/se233/asteroid/assets/PlayerShip/Explosion.png";
+    private static final String SHOOTING_EFFECT_PATH = "/se233/asteroid/assets/PlayerShip/ShootEffect.png";
 
     public PlayerShip(Point2D startPosition) {
         super(SHIP_SPRITE_PATH, startPosition, 5);
@@ -51,6 +62,73 @@ public class PlayerShip extends Character {
         setupAnimations();
     }
 
+    public void startThrust() {
+        if (!isThrusting && !isExploding && isAlive) {
+            isThrusting = true;
+            currentThrusterFrame = 0;
+
+            // Show thruster sprite
+            thrusterSprite.setVisible(true);
+
+            // Stop any existing animation
+            if (thrusterAnimation != null) {
+                thrusterAnimation.stop();
+            }
+
+            // Create new thruster animation
+            thrusterAnimation = new Timeline(
+                    new KeyFrame(Duration.millis(50), e -> {
+                        // Calculate the next frame index (0-3 cycling)
+                        int frameIndex = (currentThrusterFrame++) % thrusterFrames.size();
+
+                        // Update thruster sprite with current frame
+                        thrusterSprite.setImage(thrusterFrames.get(frameIndex));
+
+                        // Update thruster position relative to ship
+                        updateThrusterPosition();
+                    })
+            );
+
+            // Set animation to repeat indefinitely
+            thrusterAnimation.setCycleCount(Timeline.INDEFINITE);
+            thrusterAnimation.play();
+
+            logger.debug("Thruster animation started");
+        }
+    }
+
+    public void startShootingEffect(){
+        if (!isShootingEffect && !isExploding && isAlive) {
+            isShootingEffect = true;
+            currentShootingFrame = 0;
+
+            ShootingEffect.setVisible(true);
+            updateShootEffectPosition();
+
+            if(ShootingAnimation !=null){
+                ShootingAnimation.stop();
+            }
+
+            ShootingAnimation = new Timeline(
+                    new KeyFrame(Duration.millis(50), e -> {
+                      int frameIndex = (currentShootingFrame++) % ShootingFrames.size();
+
+                      ShootingEffect.setImage(ShootingFrames.get(frameIndex));
+
+                      updateShootEffectPosition();
+                    })
+            );
+            // Set to play once
+            ShootingAnimation.setCycleCount(ShootingFrames.size());
+            ShootingAnimation.setOnFinished(e -> {
+                ShootingEffect.setVisible(false);
+                isShootingEffect = false;
+            });
+
+            ShootingAnimation.play();
+
+        }
+    }
     private void initializeShip() {
         this.lives = 3;
         this.isThrusting = false;
@@ -73,14 +151,31 @@ public class PlayerShip extends Character {
             if (thrusterStream == null) {
                 throw new RuntimeException("Could not find thruster sprite: " + THRUSTER_SPRITE_PATH);
             }
-            thrusterSprite = new ImageView(new Image(thrusterStream));
-            thrusterSprite.setFitWidth(25);
-            thrusterSprite.setFitHeight(25);
+
+            thrusterSprite = new ImageView();
+            thrusterSprite.setFitWidth(20);
+            thrusterSprite.setFitHeight(20);
             thrusterSprite.setPreserveRatio(true);
             thrusterSprite.setVisible(false);
 
+            ShootingEffect = new ImageView();
+            ShootingEffect.setFitWidth(20);
+            ShootingEffect.setFitHeight(20);
+            ShootingEffect.setPreserveRatio(true);
+            ShootingEffect.setVisible(false);
 
-            // Load animation frames with error checking
+            // Load all sprite sheets
+            loadExplosionFrames();
+            loadThrusterFrames();
+            loadShootingFrames();
+            logger.debug("All sprites initialized successfully");
+        } catch (Exception e) {
+            logger.error("Failed to initialize sprites", e);
+            throw new RuntimeException("Failed to initialize sprites", e);
+        }
+    }
+
+        private void loadExplosionFrames() {
             var explosionStream = getClass().getResourceAsStream(EXPLOSION_SPRITE_PATH);
             if (explosionStream == null) {
                 throw new RuntimeException("Could not find explosion sprite: " + EXPLOSION_SPRITE_PATH);
@@ -89,21 +184,32 @@ public class PlayerShip extends Character {
             if (explosionFrames == null || explosionFrames.isEmpty()) {
                 throw new RuntimeException("Failed to extract explosion frames");
             }
+        }
 
-            var thrusterAnimStream = getClass().getResourceAsStream(THRUSTER_SPRITE_PATH);
-            if (thrusterAnimStream == null) {
-                throw new RuntimeException("Could not find thruster animation sprite: " + THRUSTER_SPRITE_PATH);
+        private void loadThrusterFrames() {
+            var thrusterStream = getClass().getResourceAsStream(THRUSTER_SPRITE_PATH);
+            if (thrusterStream == null) {
+                throw new RuntimeException("Could not find thruster sprite: " + THRUSTER_SPRITE_PATH);
             }
             thrusterFrames = SpriteSheetUtils.extractFrames(THRUSTER_SPRITE_PATH, 4, false);
             if (thrusterFrames == null || thrusterFrames.isEmpty()) {
                 throw new RuntimeException("Failed to extract thruster frames");
             }
-
-            logger.debug("All sprites initialized successfully");
-        } catch (Exception e) {
-            logger.error("Failed to initialize sprites", e);
-            throw new RuntimeException("Failed to initialize ship sprites", e);
         }
+
+        private void loadShootingFrames() {
+            var shootingStream = getClass().getResourceAsStream(SHOOTING_EFFECT_PATH);
+            if (shootingStream == null) {
+                throw new RuntimeException("Could not find shooting effect sprite: " + SHOOTING_EFFECT_PATH);
+            }
+            ShootingFrames = SpriteSheetUtils.extractFrames(SHOOTING_EFFECT_PATH, 4, false);
+            if (ShootingFrames == null || ShootingFrames.isEmpty()) {
+                throw new RuntimeException("Failed to extract shooting frames");
+            }
+        }
+
+    private Image createEmptyImage(int width, int height) {
+        return new WritableImage(width, height);
     }
 
     private void setupAnimations() {
@@ -113,6 +219,9 @@ public class PlayerShip extends Character {
         if (thrusterFrames == null || thrusterFrames.isEmpty()) {
             throw new RuntimeException("Thruster frames not initialized");
         }
+        if (ShootingFrames == null || ShootingFrames.isEmpty()){
+            throw new RuntimeException("Shooting frames not initialized");
+            }
 
         // Explosion animation
         explosionAnimation = new Timeline(
@@ -130,13 +239,23 @@ public class PlayerShip extends Character {
         // Thruster animation
         thrusterAnimation = new Timeline(
                 new KeyFrame(Duration.millis(100), e -> {
-                    if (isThrusting) {
+                    if (currentThrusterFrame < thrusterFrames.size()) {
                         int frame = (int) (System.currentTimeMillis() / 100 % thrusterFrames.size());
-                        thrusterSprite.setImage(thrusterFrames.get(frame));
+                        sprite.setImage(thrusterFrames.get(currentThrusterFrame++));
                     }
                 })
         );
-        thrusterAnimation.setCycleCount(Timeline.INDEFINITE);
+        thrusterAnimation.setCycleCount(thrusterFrames.size());
+
+        ShootingAnimation = new Timeline(
+                new KeyFrame(Duration.millis(100), e -> {
+                    if (currentShootingFrame < ShootingFrames.size()){
+                        int frame = (int) (System.currentTimeMillis()/100 % ShootingFrames.size());
+                        sprite.setImage(ShootingFrames.get(currentShootingFrame++));
+                    }
+                })
+        );
+        ShootingAnimation.setCycleCount(ShootingFrames.size());
 
         // Invulnerability animation
         invulnerabilityAnimation = new Timeline(
@@ -169,14 +288,46 @@ public class PlayerShip extends Character {
     }
 
     private void updateThrusterPosition() {
-        double radians = Math.toRadians(rotation - 90);
-        Point2D thrusterOffset = new Point2D(Math.cos(radians) * -20, Math.sin(radians) * -20);
-        thrusterSprite.setTranslateX(position.getX() + thrusterOffset.getX() - thrusterSprite.getBoundsInLocal().getWidth() / 2);
-        thrusterSprite.setTranslateY(position.getY() + thrusterOffset.getY() - thrusterSprite.getBoundsInLocal().getHeight() / 2);
-        thrusterSprite.setRotate(rotation);
+        if (thrusterSprite != null && isThrusting) {
+            // Calculate position behind the ship based on current rotation
+            double radians = Math.toRadians(rotation - 90); // Adjust angle to match ship's direction
+
+            // Position thruster behind the ship
+            Point2D thrusterOffset = new Point2D(
+                    Math.cos(radians) * -20, // Move thruster back by 20 pixels
+                    Math.sin(radians) * -20
+            );
+
+            // Update thruster sprite position
+            thrusterSprite.setTranslateX(position.getX() + thrusterOffset.getX() - thrusterSprite.getFitWidth() / 2);
+            thrusterSprite.setTranslateY(position.getY() + thrusterOffset.getY() - thrusterSprite.getFitHeight() / 2);
+
+            // Match ship's rotation
+            thrusterSprite.setRotate(rotation);
+        }
     }
 
 
+    private void updateShootEffectPosition(){
+        if (ShootingEffect != null) {
+            double radians = Math.toRadians(rotation - 90);
+
+            // คำนวณตำแหน่งปลายกระบอกปืน
+            Point2D gunOffset = new Point2D(
+                    Math.cos(radians) *  20 ,
+                    Math.sin(radians) *  20
+            );
+
+            // ปรับตำแหน่ง effect ให้อยู่ที่ปลายกระบอกปืน
+            ShootingEffect.setTranslateX(position.getX() + gunOffset.getX() - ShootingEffect.getFitWidth() / 2);
+            ShootingEffect.setTranslateY(position.getY() + gunOffset.getY() - ShootingEffect.getFitHeight() / 2);
+            ShootingEffect.setRotate(rotation);
+        }
+    }
+
+    public ImageView getShootEffectSprite() {
+        return ShootingEffect;
+    }
 
     public void moveUp() {
         if (!isExploding && isAlive) {
@@ -206,27 +357,14 @@ public class PlayerShip extends Character {
         }
     }
 
-//    public void thrust() {
-//        if (!isExploding && isAlive) {
-//            isThrusting = true;
-//            thrusterSprite.setVisible(true);
-//
-//            double radians = Math.toRadians(rotation - 90);
-//            Point2D thrustVector = new Point2D(
-//                    Math.cos(radians) * ACCELERATION,
-//                    Math.sin(radians) * ACCELERATION
-//            );
-//            velocity = velocity.add(thrustVector);
-//
-//            thrusterAnimation.play();
-//            logger.debug("Thrusting in direction: {} degrees", rotation);
-//        }
-//    }
 
     public void stopThrust() {
         isThrusting = false;
+        if (thrusterAnimation != null) {
+            thrusterAnimation.stop();
+        }
         thrusterSprite.setVisible(false);
-        thrusterAnimation.stop();
+        logger.debug("Thruster animation stopped");
     }
 
     public void rotateLeft() {
@@ -242,12 +380,59 @@ public class PlayerShip extends Character {
             logger.debug("Rotating right to {} degrees", rotation);
         }
     }
+    private Timeline createShootingAnimation() {
+        Timeline timeline = new Timeline(
+                new KeyFrame(Duration.millis(50), e -> {
+                    if (currentShootingFrame < ShootingFrames.size()) {
+                        ShootingEffect.setImage(ShootingFrames.get(currentShootingFrame++));
+                        updateShootEffectPosition();
+                    }
+                })
+        );
+
+        timeline.setCycleCount(ShootingFrames.size());
+        timeline.setOnFinished(e -> {
+            ShootingEffect.setVisible(false);
+            isShootingEffect = false;
+        });
+
+        return timeline;
+    }
+
+    private void startShootEffect() {
+        if (!isShootingEffect && !isExploding && isAlive) {
+            isShootingEffect = true;
+            currentShootingFrame = 0;
+
+            if (ShootingEffect != null) {
+                ShootingEffect.setVisible(true);
+                updateShootEffectPosition();
+
+                if (ShootingAnimation != null) {
+                    ShootingAnimation.stop();
+                }
+
+                // Only start animation if we have frames
+                if (ShootingFrames != null && !ShootingFrames.isEmpty()) {
+                    ShootingAnimation = createShootingAnimation();
+                    ShootingAnimation.play();
+                } else {
+                    // Handle case where no frames are available
+                    ShootingEffect.setVisible(false);
+                    isShootingEffect = false;
+                }
+            }
+        }
+    }
 
     public se233.asteroid.model.Bullet shoot() {
         if (!isExploding && isAlive) {
             double radians = Math.toRadians(rotation - 90);
             Point2D direction = new Point2D(Math.cos(radians), Math.sin(radians));
             Point2D bulletPosition = position.add(direction.multiply(sprite.getBoundsInLocal().getWidth() / 2));
+
+            // เริ่มแสดง shoot effect
+            startShootEffect();
             logger.info("Shooting bullet from position: {}", bulletPosition);
             // Use the fully qualified class name to avoid confusion
             return new se233.asteroid.model.Bullet(bulletPosition, direction, false);
@@ -255,7 +440,7 @@ public class PlayerShip extends Character {
         return null;
     }
 
-    public se233.asteroid.model.SpecialAttack Specialshoot(){
+    public se233.asteroid.model.SpecialAttack Specialshoot() {
         if (!isExploding && isAlive) {
             double radians = Math.toRadians(rotation - 90);
             Point2D direction = new Point2D(Math.cos(radians), Math.sin(radians));
@@ -292,8 +477,8 @@ public class PlayerShip extends Character {
         sprite.setFitHeight(hitRadius * 4);
 
         // ปรับตำแหน่งให้ centered
-        sprite.setTranslateX(position.getX() - sprite.getFitWidth()/2);
-        sprite.setTranslateY(position.getY() - sprite.getFitHeight()/2);
+        sprite.setTranslateX(position.getX() - sprite.getFitWidth() / 2);
+        sprite.setTranslateY(position.getY() - sprite.getFitHeight() / 2);
 
 //        explosionAnimation.play();
 //        explosionAnimation.setOnFinished(e -> {
@@ -305,6 +490,7 @@ public class PlayerShip extends Character {
         stopThrust(); // หยุด thruster
         logger.info("Ship explosion started");
     }
+
 
     private void respawn() {
         if (lives > 0) {
@@ -344,32 +530,6 @@ public class PlayerShip extends Character {
     }
 
 
-    public void reset() {
-        lives = 3;
-        position = new Point2D(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-        velocity = new Point2D(0, 0);
-        rotation = 0;
-        isExploding = false;
-        isInvulnerable = false;
-        isThrusting = false;
-        isAlive = true;
-        sprite.setVisible(true);
-        shieldSprite.setVisible(false);
-        thrusterSprite.setVisible(false);
-        logger.info("Ship reset to initial state");
-    }
-
-    public void dispose() {
-        if (explosionAnimation != null) explosionAnimation.stop();
-        if (thrusterAnimation != null) thrusterAnimation.stop();
-        if (invulnerabilityAnimation != null) invulnerabilityAnimation.stop();
-        logger.info("PlayerShip resources disposed");
-    }
-
-    public boolean isExploding() {
-        return isExploding;
-    }
-
     public boolean isInvulnerable() {
         return isInvulnerable;
     }
@@ -386,40 +546,5 @@ public class PlayerShip extends Character {
     public ImageView getThrusterSprite() {
         return thrusterSprite;
     }
-
-    public ImageView getShieldSprite() {
-        return shieldSprite;
-    }
-
-    // Additional helper class - Bullet
-    public static class Bullet extends Character {
-        private static final double BULLET_SPEED = 10.0;
-        private static final String BULLET_SPRITE_PATH = "src/main/resources/se233/asteroid/assets/PlayerShip/Fx_01.png";
-        private static final double BULLET_RADIUS = 2.0;
-        private static final double BULLET_LIFETIME = 2.0; // seconds
-        private double lifetime;
-
-        public Bullet(Point2D position, Point2D direction) {
-            super(BULLET_SPRITE_PATH, position, BULLET_RADIUS);
-            this.velocity = direction.multiply(BULLET_SPEED);
-            this.lifetime = BULLET_LIFETIME;
-
-            // Set bullet size
-            sprite.setFitWidth(4);
-            sprite.setFitHeight(4);
-        }
-
-        @Override
-        public void update() {
-            super.update();
-            lifetime -= 1.0 / 60.0; // Assuming 60 FPS
-        }
-
-        public boolean isExpired() {
-            return lifetime <= 0;
-        }
-    }
 }
-
-
 

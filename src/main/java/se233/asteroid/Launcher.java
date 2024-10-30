@@ -73,6 +73,7 @@ public class Launcher extends Application {
                 case SPACE:
                     if (gameView.isGameStarted() && !gameView.isPaused()) {
                         gameView.shoot();
+                        gameView.shooting();
                         logger.debug("Shoot action triggered");
                     }
                     break;
@@ -90,12 +91,12 @@ public class Launcher extends Application {
                     stage.setFullScreen(!stage.isFullScreen());
                     break;
 
-                    case F:
-                        if (gameView.isGameStarted() && !gameView.isPaused()) {
-                            gameView.Specialshoot();
-                            logger.debug("Spacial shoot action triggered");
-                        }
-                        break;
+                case F:
+                    if (gameView.isGameStarted() && !gameView.isPaused()) {
+                        gameView.Specialshoot();
+                        logger.debug("Spacial shoot action triggered");
+                    }
+                    break;
             }
         });
 
@@ -128,7 +129,7 @@ public class Launcher extends Application {
             logger.debug("Rotating right");
         }
         if (pressedKeys.contains(KeyCode.W)) {
-            gameView.moveUp();
+            gameView.thrust();
             logger.debug("Moving up");
         }
         if (pressedKeys.contains(KeyCode.S)) {

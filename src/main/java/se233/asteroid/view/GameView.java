@@ -41,7 +41,6 @@ public class GameView extends Pane {
     private static final int MAX_BOSS_SPAWNED_ENEMIES = 6; // Maximum enemies spawned by boss
     private double bossSpawnTimer = 0;
 
-
     // Game components
     private final GameStage gameStage;
     private final List<Character> gameObjects;
@@ -323,14 +322,14 @@ public class GameView extends Pane {
                 wrapAround(obj);
             }
         }
-            if (missileCooldown) {
-                missileTimer += deltaTime;
-                if (missileTimer >= MISSILE_COOLDOWN) {
-                    missileTimer = 0;
-                    missileCooldown = false;
-                    currentMissileCount = 0; // Reset missile count after cooldown
-                    logger.debug("Missile system ready - Cooldown completed");
-                }
+        if (missileCooldown) {
+            missileTimer += deltaTime;
+            if (missileTimer >= MISSILE_COOLDOWN) {
+                missileTimer = 0;
+                missileCooldown = false;
+                currentMissileCount = 0; // Reset missile count after cooldown
+                logger.debug("Missile system ready - Cooldown completed");
+            }
         }
     }
 
@@ -640,6 +639,25 @@ public class GameView extends Pane {
         }
     }
 
+    public void thrust() {
+        if (player != null) {
+            player.moveUp();
+            // Assuming PlayerShip has a method to show thrust animation
+            player.startThrust();
+        }
+    }
+    public void shooting(){
+        if (player != null) {
+            player.shoot();
+            player.startShootingEffect();
+        }
+    }
+    public void stopThrust() {
+        if (player != null) {
+            // Assuming PlayerShip has a method to stop thrust animation
+            player.stopThrust();
+        }
+    }
 
     private void spawnEnemy() {
         Point2D spawnPos = getRandomSpawnPosition();
@@ -915,7 +933,7 @@ public class GameView extends Pane {
             gameStage.addGameObject(player);
             // เพิ่ม sprite ของไอพ่นเข้าไปใน gameLayer
             gameStage.getGameLayer().getChildren().add(player.getThrusterSprite());
-//            gameStage.getGameLayer().getChildren().add(player.getShieldSprite());
+            gameStage.getGameLayer().getChildren().add(player.getShootEffectSprite());
             // Spawn initial objects
             spawnAsteroids();
             spawnInitialEnemies();
@@ -996,8 +1014,8 @@ public class GameView extends Pane {
                 }
             }
 
-                }
-            }
+        }
+    }
     public void Specialshoot() {
         if (isGameStarted && !isPaused && player != null && player.isAlive()) {
             // ตรวจสอบว่าอยู่ในช่วง cooldown หรือไม่
